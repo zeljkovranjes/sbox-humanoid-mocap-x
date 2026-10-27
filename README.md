@@ -1,35 +1,43 @@
 Humanoid Mocap X
 ================
 
+[<img alt="github" src="https://img.shields.io/badge/github-sbox--humanoid--mocap--x-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">][github]
 [<img alt="docs" src="https://img.shields.io/badge/docs-development-66c2a5?style=for-the-badge" height="20">][development]
+[<img alt="build status" src="https://img.shields.io/github/actions/workflow/status/zeljkovranjes/sbox-humanoid-mocap-x/ci.yml?branch=main&style=for-the-badge" height="20">][actions]
 
+[github]: https://github.com/zeljkovranjes/sbox-humanoid-mocap-x
 [development]: docs/development.md
+[actions]: https://github.com/zeljkovranjes/sbox-humanoid-mocap-x/actions?query=branch%3Amain
 
-This library provides [`MocapWindow`], a third-person workspace that reuses
-Humanoid Mocap's rigs, preview, foot locking and FBX exporter, with optional
-hosted processing and local C#/HLSL FlowHMR inference.
+This library provides [`MocapWindow`], a third-person workspace with built-in
+Humanoid Mocap rigs, preview, foot locking and FBX export, with optional hosted
+processing and local C#/HLSL FlowHMR inference.
 
 [`MocapWindow`]: Editor/MocapWindow.cs
 
-Use these local projects in s&box until the shared changes are published:
+Download the latest [release] and put both libraries in your project's
+`Libraries` folder. Humanoid Mocap does not need to be installed.
 
 ```text
-sbox/libraries/humanoid-mocap/humanoid-mocap.sbproj
-sbox/shaders/compute/tensor-inference/tensor-inference.sbproj
-sbox/libraries/humanoid-mocap-x/humanoid-mocap-x.sbproj
+Libraries/humanoid-mocap-x/     this repository
+Libraries/tensor-inference/     tensor-inference-<version>.zip from the release
 ```
+
+[release]: https://github.com/zeljkovranjes/sbox-humanoid-mocap-x/releases/latest
 
 Open **View > Humanoid Mocap X**, choose where videos are processed, then drop
 in a video. **Advanced** opens Mocap adjustments, where **Open motion…** loads
-an existing full-body `.hmotion` capture. The published Humanoid Mocap package
-does not yet include the constructor this workspace requires.
+an existing full-body `.hmotion` capture.
 
 <br>
 
 ## Details
 
 - Human is the initial target. Classic Citizen and custom VMDL, FBX and GLB
-  targets use the shared retargeter. Exported FBX uses ModelDoc import scale 1.
+  targets use the built-in retargeter. Exported FBX uses ModelDoc import scale 1.
+- Humanoid Mocap's code is copied into `Code/HumanoidMocap` and
+  `Editor/HumanoidMocap` under the `HumanoidMocapX` namespace, so both packages
+  can be installed side by side without type or menu collisions.
 - Foot locking is enabled by default for target retargeting. Source-skeleton
   export preserves the capture without target corrections.
 - Settings > **Processing > Setup** chooses between this computer (download
@@ -40,8 +48,8 @@ does not yet include the constructor this workspace requires.
 - Providers process videos with the [in-editor host]: the library serves the
   capture API from an s&box editor on Windows and runs the same GPU pipeline as
   local capture. The [provider guide] covers the website, sign-in, roles and
-  HTTPS. The standalone C# service in `services/humanoid-mocap-host` is only a
-  starter for custom processors.
+  HTTPS. The standalone C# service `humanoid-mocap-host` (in the release as
+  `humanoid-mocap-host-<version>.zip`) is only a starter for custom processors.
 
 [in-editor host]: docs/editor-host.md
 [provider guide]: docs/provider-guide.md
@@ -84,6 +92,9 @@ DINOv3 adaptations retain the <a href="LICENSE-DINOV3">DINOv3 License</a>.
 SAM decoder adaptations retain the <a href="LICENSE-SAM">SAM License</a>.
 Pillow resampling adaptations retain the
 <a href="LICENSE-PILLOW">MIT-CMU license</a>.
+Code copied from Humanoid Mocap keeps its
+<a href="THIRD_PARTY_NOTICES.md#humanoid-mocap">notices</a>, including GVHMR's
+noncommercial terms.
 FlowHMR weights have separate
 <a href="https://huggingface.co/fafsaf1/flowhmr-0.46B#license">non-commercial
 terms</a>. No model weights are bundled.

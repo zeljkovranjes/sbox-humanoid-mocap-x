@@ -15,7 +15,7 @@ signed account requests to this loopback listener. See the [provider guide],
 ## Requirements
 
 - A running Windows s&box editor with Media Foundation, the library and its
-  shared Humanoid Mocap/tensor-inference dependencies installed.
+  tensor-inference dependency installed.
 - A GPU with a reported memory budget. Kernels use s&box graphics APIs on AMD
   and NVIDIA; native NVIDIA acceptance remains to be performed.
 - Both FlowHMR releases and all perception/rig weights installed through

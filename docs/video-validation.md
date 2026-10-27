@@ -149,7 +149,7 @@ and compares target foot movement with stabilization enabled/disabled:
 ```sh
 dotnet run --project dev/MotionChecks.csproj -- \
   /path/to/capture.hmotion \
-  ../humanoid-mocap/Assets/data/humanoid_mocap /path/to/quality.json
+  Assets/data/humanoid_mocap /path/to/quality.json
 ```
 
 Both Desktop variants preserve all 30 Human finger joints and all 24 mapped
