@@ -10,28 +10,19 @@
     <Compile Include="../Editor/CaptureModels.cs" Link="CaptureModels.cs" />
     <Compile Include="../Editor/VideoFrames.cs" Link="VideoFrames.cs" />
     <Compile Include="../Editor/FlowCapture.cs" Link="FlowCapture.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/DecodedVideoFrame.cs" Link="DecodedVideoFrame.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/WindowsVideoDecoder.cs" Link="WindowsVideoDecoder.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/VideoFrameLayout.cs" Link="VideoFrameLayout.cs" />
+    <Compile Include="../Editor/HumanoidMocap/Video/DecodedVideoFrame.cs" Link="DecodedVideoFrame.cs" />
+    <Compile Include="../Editor/HumanoidMocap/Video/WindowsVideoDecoder.cs" Link="WindowsVideoDecoder.cs" />
+    <Compile Include="../Editor/HumanoidMocap/Video/VideoFrameLayout.cs" Link="VideoFrameLayout.cs" />
     <Compile Include="../Editor/Hosting/*.cs" Link="%(Filename)%(Extension)" />
     <Compile Include="../Editor/FlowCheckpoint.cs" Link="FlowCheckpoint.cs" />
     <Compile Include="../Editor/SmplModel.cs" Link="SmplModel.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/NumpyArray.cs" Link="NumpyArray.cs" />
     <Compile Include="../Editor/YoloCheckpoint.cs" Link="YoloCheckpoint.cs" />
     <Compile Include="../Editor/VisionCheckpoint.cs" Link="VisionCheckpoint.cs" />
     <Compile Include="../Editor/MhrCheckpoint.cs" Link="MhrCheckpoint.cs" />
     <Compile Include="../Editor/SamCheckpoint.cs" Link="SamCheckpoint.cs" />
     <Compile Include="../Editor/Inference/*.cs" Link="%(Filename)%(Extension)" />
-    <Compile Include="../Editor/HumanoidMocap/MotionBricks/NeuralOps.cs" Link="NeuralOps.cs" />
-    <Compile Include="../Editor/HumanoidMocap/MotionBricks/Tensor.cs" Link="Tensor.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/TorchCheckpoint.cs" Link="TorchCheckpoint.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/TorchCheckpoint.Script.cs" Link="TorchCheckpoint.Script.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/GvhmrDecoder.cs" Link="GvhmrDecoder.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/GvhmrStatistics.cs" Link="GvhmrStatistics.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/GvhmrTemporalNetwork.cs" Link="GvhmrTemporalNetwork.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/FileChecksum.cs" Link="FileChecksum.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/LinearRgbImage.cs" Link="LinearRgbImage.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/VideoPreviewCache.cs" Link="VideoPreviewCache.cs" />
+    <Compile Include="../Editor/HumanoidMocap/Video/LinearRgbImage.cs" Link="LinearRgbImage.cs" />
+    <Compile Include="../Editor/HumanoidMocap/Video/VideoPreviewCache.cs" Link="VideoPreviewCache.cs" />
     <None Include="../Assets/data/humanoid_mocap/target_rig_*.json" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -1,7 +1,6 @@
-using HumanoidMocapX.EditorTools.MotionBricks;
+using HumanoidMocapX.Inference;
 using HumanoidMocapX;
 using HumanoidMocapX.EditorTools;
-using HumanoidMocapX.Inference;
 
 static class OmegaVisionTests
 {

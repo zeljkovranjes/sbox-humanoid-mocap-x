@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Numerics;
 using System.Threading;
-using HumanoidMocapX.EditorTools.Inference;
 
 namespace HumanoidMocapX.Inference;
 
@@ -107,7 +106,7 @@ internal sealed class FlowDecoder
                 rows[axis + Coordinates] = Denormalize(values, offset + axis * 2 + 1);
             }
             Quaternion rotation;
-            try { rotation = Quaternion.Conjugate(GvhmrDecoder.Rotation6D(rows)); }
+            try { rotation = Quaternion.Conjugate(Rotation6D(rows)); }
             catch (ArgumentException error) { throw new InvalidDataException($"Invalid FlowHMR rotation at frame {frame}, joint {joint}.", error); }
             if (joint == 0) rotation = new Quaternion(0, 1, 0, 0) * rotation;
             if (rotation.W < 0) rotation = -rotation;
@@ -126,6 +125,24 @@ internal sealed class FlowDecoder
 
     static float Finite(float value) => float.IsFinite(value) ? value
         : throw new InvalidDataException("FlowHMR decoded motion exceeds the finite numeric range.");
+
+    /// <summary>Gram-Schmidt rotation from the first two rows of a rotation matrix.
+    /// Throws ArgumentException for non-finite, degenerate or collinear rows.</summary>
+    static Quaternion Rotation6D(ReadOnlySpan<float> values)
+    {
+        if (values.Length != 6) throw new ArgumentException("Rotation requires six components.");
+        var a = new Vector3(values[0], values[1], values[2]); var b = new Vector3(values[3], values[4], values[5]);
+        if (!IsFinite(a) || !IsFinite(b) || a.LengthSquared() < 1e-16f) throw new ArgumentException("Degenerate/non-finite 6D rotation.");
+        var r0 = Vector3.Normalize(a); var residual = b - Vector3.Dot(r0, b) * r0;
+        if (residual.LengthSquared() < 1e-16f) throw new ArgumentException("Collinear 6D rotation axes.");
+        var r1 = Vector3.Normalize(residual); var r2 = Vector3.Cross(r0, r1);
+        // PyTorch3D uses column vectors and stores the first two matrix rows. System.Numerics
+        // uses row vectors: transpose at this boundary, then use quaternion composition.
+        return Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(new Matrix4x4(
+            r0.X, r1.X, r2.X, 0, r0.Y, r1.Y, r2.Y, 0, r0.Z, r1.Z, r2.Z, 0, 0, 0, 0, 1)));
+    }
+
+    static bool IsFinite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 
     static void Validate(ReadOnlySpan<float> values, int length, string name)
     {

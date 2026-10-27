@@ -15,12 +15,6 @@ namespace HumanoidMocapX.EditorTools;
 public sealed partial class RetargetWindow
 {
     bool _exportingMotion;
-    /// <summary>Where the last export wrote the MotionBricks rebuild, or null when there was none.</summary>
-    string _exportedRebuilt;
-
-    /// <summary><c>walk.fbx</c> → <c>walk_rebuilt.fbx</c>, beside it.</summary>
-    internal static string RebuiltPath(string path)
-        => Path.Combine(Path.GetDirectoryName(path) ?? "", Path.GetFileNameWithoutExtension(path) + RebuiltSuffix + Path.GetExtension(path));
 
     async void PickMotionExport(bool retarget)
     {
@@ -34,9 +28,7 @@ public sealed partial class RetargetWindow
         {
             await ExportMotionFbxAsync(path, retarget);
             await EditorPipeline.SwitchToMainThread();
-            if (this.IsValid()) _captureStatus.Text = _exportedRebuilt is { } rebuilt
-                ? $"Exported {Path.GetFileName(path)} and {Path.GetFileName(rebuilt)} (AI version) · armature and bone animation."
-                : $"Exported {Path.GetFileName(path)} · armature and bone animation.";
+            if (this.IsValid()) _captureStatus.Text = $"Exported {Path.GetFileName(path)} · armature and bone animation.";
         }
         catch (Exception e) { await EditorPipeline.SwitchToMainThread(); if (this.IsValid()) _captureStatus.Text = e.Message; }
     }
@@ -65,14 +57,7 @@ public sealed partial class RetargetWindow
             if (!this.IsValid()) return;
             var motion = _editedMotion;var preview=_bakedPreview;
             if(retarget&&preview is null)throw new InvalidOperationException("Wait for a valid animation preview before exporting.");
-            // A MotionBricks rebuild shown beside the capture is exported beside it.
-            var rebuilt=CurrentRebuilt;var rebuiltPreview=_rebuiltBaked;_exportedRebuilt=null;
-            if(rebuilt is not null&&retarget&&rebuiltPreview is null)throw new InvalidOperationException("Wait for the rebuilt animation's preview before exporting.");
-            var rebuiltDestination=rebuilt is null?null:RebuiltPath(destination);
-            if(rebuiltDestination is not null&&_target?.ModelFilePath is { } model&&string.Equals(rebuiltDestination,Path.GetFullPath(model),StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Choose a new animation filename to preserve the original target model.");
             await Write(destination,motion,preview);
-            if(rebuiltDestination is not null){await Write(rebuiltDestination,rebuilt,rebuiltPreview);_exportedRebuilt=rebuiltDestination;}
         }
         finally { await EditorPipeline.SwitchToMainThread(); _exportingMotion = false;if(this.IsValid())UpdateExportAvailability(); }
 
@@ -84,12 +69,8 @@ public sealed partial class RetargetWindow
                 // Export the exact baked transforms shown in the viewport. Unapplied
                 // edits in Advanced must not silently change the exported animation.
                 var clip=preview.Clip;var target=preview.Target;
-                if(preview.Props.Objects.Count>0&&!preview.SupportsProps)
-                    throw new InvalidOperationException("Target prop export currently needs First Person workspace, camera-relative hand capture and root-motion removal off. Export the captured skeleton to retain objects in source coordinates.");
-                var sourceTimes=Enumerable.Range(0,clip.SolvedFrames.Count).Select(i=>Math.Min(preview.Props.StartTime+i/(double)clip.Fps,preview.Props.EndTime)).ToArray();
-                var combined=PropAnimation.Append(target.Rig.Skeleton,clip.SolvedFrames,sourceTimes,preview.Props,preview.Placement);
                 var fps=clip.Fps*speed;
-                return ModelDocFbxExport.Write(combined.Skeleton, clip.ClipName, combined.Frames,
+                return ModelDocFbxExport.Write(target.Rig.Skeleton, clip.ClipName, clip.SolvedFrames,
                     Enumerable.Range(0, clip.SolvedFrames.Count).Select(i => i / (double)fps).ToArray(), fps,
                     target.UpAxis,
                     preview.Space + "; retargeted");

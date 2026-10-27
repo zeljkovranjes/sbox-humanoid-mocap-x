@@ -1,7 +1,5 @@
 using HumanoidMocapX.Inference;
 using HumanoidMocapX.EditorTools;
-using HumanoidMocapX.EditorTools.Inference;
-using HumanoidMocapX.EditorTools.MotionBricks;
 
 static class YoloTests
 {

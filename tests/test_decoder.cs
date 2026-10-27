@@ -3,10 +3,9 @@ using System.IO.Compression;
 using System.Text;
 using HumanoidMocapX.Core.Maths;
 using HumanoidMocapX.Core.Motion;
-using HumanoidMocapX.EditorTools.MotionBricks;
+using HumanoidMocapX.Inference;
 using HumanoidMocapX;
 using HumanoidMocapX.EditorTools;
-using HumanoidMocapX.Inference;
 
 static class DecoderTests
 {

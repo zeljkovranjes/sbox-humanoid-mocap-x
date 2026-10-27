@@ -280,7 +280,6 @@ public static class TargetPickers
 				BaseModelPath = path,
 				DefaultRootBone = RootBoneName( skeleton, map ),
 				UpAxis = TargetUpAxis.ZUpEngine,        // Model.Bones bind pose is engine space
-				DlWeights = DlAssets.TryLoadWeights(),
 			},
 			Description = description,
 			PreviewModelPath = path,
@@ -517,7 +516,6 @@ public static class TargetPickers
 				// compiler applies no rotation (the embedded mesh is in the same space) -
 				// declaring Y-up would compile the animation lying on its back.
 				UpAxis = upAxis == 2 ? TargetUpAxis.ZUpCm : TargetUpAxis.YUpCm,
-				DlWeights = DlAssets.TryLoadWeights(),
 			},
 			Description = $"Custom {Path.GetExtension( filePath ).TrimStart( '.' ).ToUpperInvariant()}: {Path.GetFileName( filePath )}",
 			PreviewModelPath = null,

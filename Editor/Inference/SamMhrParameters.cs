@@ -3,7 +3,6 @@
 using System;
 using System.IO;
 using System.Threading;
-using HumanoidMocapX.EditorTools.MotionBricks;
 
 namespace HumanoidMocapX.Inference;
 

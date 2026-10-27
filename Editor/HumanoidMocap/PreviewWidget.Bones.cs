@@ -9,14 +9,11 @@ public sealed partial class PreviewWidget
     /// <summary>Blender-style octahedral bones and round joints on the solved target.
     /// Gizmo IgnoreDepth keeps them visible through the skinned mesh.</summary>
     public bool ShowTargetBones { get; set; } = true;
-    public int TargetBoneOverlayCount { get; private set; }
     static readonly Color TargetBoneOutline = new(1f,.58f,.16f,1f);
 
     void DrawTargetBones()
     {
-        DrawPropBones();
-        TargetBoneOverlayCount=0;
-        if(_clip is not null&&!FirstPerson)
+        if(_clip is not null)
         {
             UpdateGizmoInputs(false);
             using(Gizmo.Scope("HumanoidMocap.Ground"))
@@ -39,14 +36,13 @@ public sealed partial class PreviewWidget
             foreach(var bone in _rig.Skeleton.Bones)
             {
                 if(_rig.RoleOf(bone.Index) is not { } role)continue;
-                if(FirstPerson&&!IsArmOrFinger(role))continue;
                 // The clavicle's parenting offset starts at the chest bone, well below
                 // the collarbone. It is a hierarchy link, not a solid anatomical bone.
                 // The actual clavicle is drawn by the clavicle -> upper-arm edge below.
                 if(role is BoneRole.ClavicleL or BoneRole.ClavicleR)continue;
                 var parent=bone.ParentIndex;
                 while(parent>=0&&_rig.RoleOf(parent) is null)parent=_rig.Skeleton[parent].ParentIndex;
-                if(parent<0||FirstPerson&&_rig.RoleOf(parent) is { } parentRole&&!IsArmOrFinger(parentRole))continue;
+                if(parent<0)continue;
                 if(!TryTargetBonePosition(parent,out var head)||!TryTargetBonePosition(bone.Index,out var tail))continue;
                 var delta=tail-head;var length=delta.Length;
                 if(length<.02f)continue;
@@ -72,7 +68,6 @@ public sealed partial class PreviewWidget
                 }
                 var radius=Math.Clamp(length*.045f,.045f,.2f);
                 Gizmo.Draw.SolidSphere(head,radius,6,6);Gizmo.Draw.SolidSphere(tail,radius,6,6);
-                TargetBoneOverlayCount++;
             }
         }
     }
@@ -91,10 +86,4 @@ public sealed partial class PreviewWidget
         position=RigWorldToEngine(_worldScratch[index]).Position;
         return true;
     }
-
-    static bool IsArmOrFinger(BoneRole role)=>role is BoneRole.UpperArmL or BoneRole.UpperArmR or
-        BoneRole.LowerArmL or BoneRole.LowerArmR or BoneRole.HandL or BoneRole.HandR||
-        role.ToString().StartsWith("Thumb",StringComparison.Ordinal)||role.ToString().StartsWith("Index",StringComparison.Ordinal)||
-        role.ToString().StartsWith("Middle",StringComparison.Ordinal)||role.ToString().StartsWith("Ring",StringComparison.Ordinal)||
-        role.ToString().StartsWith("Pinky",StringComparison.Ordinal);
 }

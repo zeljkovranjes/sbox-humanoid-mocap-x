@@ -7,9 +7,7 @@
     <Compile Include="released_gpu_checks.cs;../Editor/YoloCheckpoint.cs" />
     <Compile Include="../Editor/MhrCheckpoint.cs" />
     <Compile Include="../Editor/SamCheckpoint.cs;../Editor/VisionCheckpoint.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/TorchCheckpoint.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/TorchCheckpoint.Script.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/LinearRgbImage.cs" />
+    <Compile Include="../Editor/HumanoidMocap/Video/LinearRgbImage.cs" />
     <Compile Include="omega_gpu_checks.cs;../tests/common/omega_fixture.cs" />
     <Compile Include="sam_gpu_checks.cs;../tests/common/sam_fixture.cs" />
     <Compile Include="sam_released_checks.cs" />
@@ -17,14 +15,11 @@
     <Compile Include="sam_feature_checks.cs;../Editor/SamFeatures.cs" />
     <Compile Include="clip_checks.cs;../Editor/FlowVideoProcessor.cs;../Editor/FlowCheckpoint.cs" />
     <Compile Include="../Editor/CaptureModels.cs" />
-    <Compile Include="../Editor/SmplModel.cs;../Editor/HumanoidMocap/Inference/NumpyArray.cs" />
+    <Compile Include="../Editor/SmplModel.cs" />
     <Compile Include="../Editor/Gpu/*.cs" />
     <Compile Include="../Editor/FlowMotionAdapter.cs" />
     <Compile Include="../Editor/Inference/*.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/GvhmrDecoder.cs;../Editor/HumanoidMocap/Inference/GvhmrStatistics.cs;../Editor/HumanoidMocap/Inference/GvhmrTemporalNetwork.cs" />
-    <Compile Include="../Editor/HumanoidMocap/Inference/FileChecksum.cs" />
     <Compile Include="../tests/test_denoiser.cs;../tests/test_refiner.cs;../tests/test_motion.cs;../tests/common/denoiser_reference.cs" />
-    <Compile Include="../Editor/HumanoidMocap/MotionBricks/Tensor.cs;../Editor/HumanoidMocap/MotionBricks/NeuralOps.cs" />
     <ProjectReference Include="Core.csproj" />
     <ProjectReference Include="../../../shaders/compute/tensor-inference/dev/Build.csproj" />
     <Reference Include="$(FACEPUNCH_ENGINE)/bin/managed/*.dll" />

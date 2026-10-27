@@ -1,6 +1,5 @@
 using System;
 using System.Threading;
-using HumanoidMocapX.EditorTools.MotionBricks;
 
 namespace HumanoidMocapX.Inference;
 

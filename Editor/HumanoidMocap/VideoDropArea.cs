@@ -10,26 +10,24 @@ namespace HumanoidMocapX.EditorTools;
 sealed class VideoDropArea : Widget
 {
     readonly Action<string> import;
-    readonly bool allowDepthRecording;
     readonly VideoIcon icon;
     readonly Label title, help, or;
-    readonly Button choose, phone;
+    readonly Button choose;
     readonly string prompt;
     int hover;
-    public VideoDropArea(Widget parent, Action<string> import, Action chooseVideo, Action phoneUpload, bool allowDepthRecording = true) : base(parent)
+    public VideoDropArea(Widget parent, Action<string> import, Action chooseVideo) : base(parent)
     {
-        this.import=import;this.allowDepthRecording=allowDepthRecording;AcceptDrops=true;Layout=Layout.Column();Layout.Margin=12;Layout.Spacing=8;
+        this.import=import;AcceptDrops=true;Layout=Layout.Column();Layout.Margin=12;Layout.Spacing=8;
         Layout.AddStretchCell();
         var row=Layout.AddRow();row.AddStretchCell();var center=row.AddColumn();center.Spacing=12;
         icon=center.Add(new VideoIcon(this));
         title=center.Add(new Label.Subtitle("Video to motion"){Alignment=TextFlag.Center});
-        prompt=allowDepthRecording?"Please drag and drop a video here (.mp4, .mov) or a Record3D LiDAR recording (.r3d)":"Drag and drop a video here (.mp4, .mov, .m4v, .avi, .mkv, .webm)";
+        prompt="Drag and drop a video here (.mp4, .mov, .m4v, .avi, .mkv, .webm)";
         help=center.Add(new Label(prompt,this){Alignment=TextFlag.Center});
         help.SetStyles($"color: {Theme.TextLight.Hex};");
         or=center.Add(new Label("or",this){Alignment=TextFlag.Center});
         var choice=center.AddRow();choice.Spacing=8;choice.AddStretchCell();
         choose=choice.Add(new Button.Primary("Choose Video"){Icon="video_file",Tint=Theme.Green,MinimumWidth=140,FixedHeight=32,Clicked=chooseVideo});
-        if(phoneUpload is not null)phone=choice.Add(new MocapButton("From phone","qr_code_2"){FixedHeight=32,Clicked=phoneUpload});
         choice.AddStretchCell();
         row.AddStretchCell();Layout.AddStretchCell();
     }
@@ -42,13 +40,11 @@ sealed class VideoDropArea : Widget
         icon.Icon=locked?"block":"video_file";
         title.Text=locked?"Currently disabled":"Video to motion";
         help.Text=reason??prompt;help.SetStyles($"color: {(locked?Theme.Yellow:Theme.TextLight).Hex};");
-        or.Visible=choose.Visible=!locked;if(phone is not null)phone.Visible=!locked;
+        or.Visible=choose.Visible=!locked;
         Update();
     }
     bool Supported(string path)=>Path.GetExtension(path).ToLowerInvariant() switch {
-        ".mp4" or ".mov" or ".m4v" => true,
-        ".r3d" => allowDepthRecording,
-        ".avi" or ".mkv" or ".webm" => !allowDepthRecording,
+        ".mp4" or ".mov" or ".m4v" or ".avi" or ".mkv" or ".webm" => true,
         _ => false
     };
     public override void OnDragHover(DragEvent e)

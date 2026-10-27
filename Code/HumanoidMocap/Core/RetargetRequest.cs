@@ -19,34 +19,19 @@ public sealed class RetargetRequest
 {
     /// <summary>Final target-proportion correction, before IK helper baking and export.</summary>
     public Motion.TargetCorrectionSettings? MocapCorrections { get; init; }
-    /// <summary>Solver choice for this request's clips. <see cref="SolverKind.DeepLearning"/>
-    /// requires the batch's <see cref="RetargetTargetSpec.DlWeights"/> to be set; the
-    /// conversion fails per-clip with a clear error otherwise.</summary>
-    public SolverKind Solver { get; init; } = SolverKind.Geometric;
 
     /// <summary>Raw bytes of the source file (.fbx, .bvh, .glb, .gltf, .vrm, .anm, .an5 or .cba).</summary>
     public required byte[] SourceData { get; init; }
 
     /// <summary>
     /// Source file name (used for the report and DMX provenance). The extension drives the
-    /// format choice (<c>.fbx</c> / <c>.bvh</c> / <c>.glb</c> / <c>.gltf</c> / <c>.vrm</c> —
-    /// a VRM is a glTF container whose authored humanoid bone map becomes the mapping — /
-    /// <c>.anm</c> / <c>.an5</c> RenderWare animations and <c>.cba</c> EA ANT packages,
-    /// which additionally need <see cref="SkeletonData"/>); when the extension is unknown the content is sniffed
-    /// (FBX binary magic / "FBXHeaderExtension" / BVH "HIERARCHY" / GLB 'glTF' magic /
-    /// glTF JSON / RenderWare 0x1B animation chunk / ANTSTM3b).
+    /// format choice (<c>.hmotion</c> / <c>.fbx</c> / <c>.glb</c> / <c>.gltf</c> / <c>.vrm</c> —
+    /// a VRM is a glTF container whose authored humanoid bone map becomes the mapping);
+    /// when the extension is unknown the content is sniffed (FBX binary magic /
+    /// "FBXHeaderExtension" / GLB 'glTF' magic / glTF JSON).
     /// </summary>
     public required string SourceFileName { get; init; }
 
-    /// <summary>
-    /// Raw bytes of a companion SKELETON file for formats whose animation files carry no
-    /// skeleton of their own: RenderWare <c>.anm</c>/<c>.an5</c> sources require the
-    /// character model's <c>.dff</c>; EA ANT <c>.cba</c> sources require an ordered joint-table
-    /// JSON (either the root array or an extracted <c>{ "joints": [...] }</c> wrapper).
-    /// Callers resolve the companion file; the facade does no file IO. Ignored by
-    /// self-contained formats. A request without its required companion fails clearly.
-    /// </summary>
-    public byte[]? SkeletonData { get; init; }
 
     /// <summary>
     /// Optional external-buffer reader for plain <c>.gltf</c> input. IO-owning callers
@@ -291,26 +276,16 @@ public sealed class RetargetTargetSpec
     public TargetUpAxis UpAxis { get; init; } = TargetUpAxis.YUpCm;
 
     /// <summary>
-    /// Raw bytes of the committed SAME weight blob
-    /// (<c>Assets/data/humanoid_mocap/dl/same_v1.weights</c>; callers do the file IO).
-    /// Required only when a request selects <see cref="SolverKind.DeepLearning"/>; the
-    /// solver instance is built once per batch from these bytes.
-    /// </summary>
-    public byte[]? DlWeights { get; init; }
-
-    /// <summary>
     /// The shipped s&amp;box default target: rig parsed from the committed
     /// <c>Assets/data/humanoid_mocap/target_rig_sbox.json</c> text (callers do the file IO),
-    /// 0.3937 vmdl scale, citizen human male base model, pelvis root. Pass the committed
-    /// SAME weight bytes as <paramref name="dlWeights"/> to enable the deep-learning solver.
+    /// 0.3937 vmdl scale, citizen human male base model, pelvis root.
     /// </summary>
-    public static RetargetTargetSpec SboxDefault(string targetRigJson, byte[]? dlWeights = null) => new()
+    public static RetargetTargetSpec SboxDefault(string targetRigJson) => new()
     {
         Rig = TargetRig.SboxDefault(targetRigJson),
         VmdlScale = SboxSourceScale,
         BaseModelPath = SboxHumanMalePath,
         DefaultRootBone = "pelvis",
-        DlWeights = dlWeights,
     };
 
     /// <summary>
@@ -318,17 +293,15 @@ public sealed class RetargetTargetSpec
     /// <c>Assets/data/humanoid_mocap/target_rig_sbox_citizen.json</c> text (callers do the
     /// file IO), 0.3937 vmdl scale, citizen base model, pelvis root, Y-up cm. The rig has no
     /// pinky bones, so pinky roles stay unassigned — the engine's own constraints handle the
-    /// pinky at runtime for models that have one. Pass the committed SAME weight bytes as
-    /// <paramref name="dlWeights"/> to enable the deep-learning solver.
+    /// pinky at runtime for models that have one.
     /// </summary>
-    public static RetargetTargetSpec SboxCitizen(string targetRigJson, byte[]? dlWeights = null) => new()
+    public static RetargetTargetSpec SboxCitizen(string targetRigJson) => new()
     {
         Rig = TargetRig.Load(targetRigJson),
         VmdlScale = SboxSourceScale,
         BaseModelPath = SboxCitizenPath,
         DefaultRootBone = "pelvis",
         UpAxis = TargetUpAxis.YUpCm,
-        DlWeights = dlWeights,
     };
 }
 
