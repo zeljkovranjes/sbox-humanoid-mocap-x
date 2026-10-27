@@ -47,10 +47,21 @@ sealed class VideoDropArea : Widget
         ".mp4" or ".mov" or ".m4v" or ".avi" or ".mkv" or ".webm" => true,
         _ => false
     };
+    // Copy is the one action every file manager offers; an X11 drag source (Dolphin through
+    // XWayland) can refuse a drop that asks for Link, so the file never arrives.
     public override void OnDragHover(DragEvent e)
-    {bool valid=e.Data.HasFileOrFolder&&Supported(e.Data.FileOrFolder);hover=valid?1:-1;if(valid)e.Action=DropAction.Link;Update();}
+    {bool valid=DroppedFile(e.Data) is { } path&&Supported(path);hover=valid?1:-1;if(valid)e.Action=DropAction.Copy;Update();}
     public override void OnDragDrop(DragEvent e)
-    {hover=0;if(e.Data.HasFileOrFolder&&Supported(e.Data.FileOrFolder)){e.Action=DropAction.Link;import(e.Data.FileOrFolder);}Update();}
+    {hover=0;if(DroppedFile(e.Data) is { } path&&Supported(path)){e.Action=DropAction.Copy;import(path);}Update();}
+    /// <summary>The first dropped local file, read from its file URL. s&amp;box's text fallback
+    /// strips the leading '/' from Linux paths. Null when the drag carries no local file.</summary>
+    static string DroppedFile(DragData data)
+    {
+        if(data.Url is { IsFile: true } url)return url.LocalPath;
+        // A '#' in a file name would otherwise start a URI fragment.
+        var first=data.Text?.Split('\n')[0].Trim().Replace("#","%23");
+        return Uri.TryCreate(first,UriKind.Absolute,out var uri)&&uri.IsFile?uri.LocalPath:null;
+    }
     public override void OnDragLeave(){hover=0;Update();}
     protected override void OnPaint()
     {
