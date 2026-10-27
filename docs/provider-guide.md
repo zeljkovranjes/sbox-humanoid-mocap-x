@@ -19,10 +19,11 @@ port.
 
 ## 1. Machine
 
-- Windows 10/11 with an s&box editor install, Node 24 or later, and a reverse
-  proxy that terminates HTTPS (Caddy, nginx or IIS). Uploaded videos are
-  decoded with Windows Media Foundation, so the processing host needs Windows;
-  the website can run anywhere Node runs.
+- Windows 10/11 or Linux with an s&box editor install, Node 24 or later, and a
+  reverse proxy that terminates HTTPS (Caddy, nginx or IIS). Uploaded videos are
+  decoded with Windows Media Foundation on Windows and the system FFmpeg
+  (`ffmpeg` and `ffprobe` on `PATH`) on Linux; the website can run anywhere
+  Node runs.
 - A GPU with enough free memory for at least one job. The host reserves each
   job's estimated peak, which grows with the clip, before starting it; see
   [Queue and memory admission]. Processing has been measured on an AMD RX 9070
