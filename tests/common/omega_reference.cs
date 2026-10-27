@@ -1,5 +1,5 @@
 using System.Numerics;
-using HumanoidMocapX.EditorTools.MotionBricks;
+using HumanoidMocapX.Inference;
 
 static class OmegaReference
 {

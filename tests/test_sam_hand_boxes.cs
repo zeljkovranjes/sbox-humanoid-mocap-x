@@ -1,5 +1,4 @@
 using HumanoidMocapX.Inference;
-using HumanoidMocapX.EditorTools.MotionBricks;
 
 static class SamHandBoxTests
 {

@@ -1,7 +1,6 @@
 // C# adaptation of FlowHMR's SingleTokenRefiner. See THIRD_PARTY_NOTICES.md.
 using System;
 using System.Threading;
-using HumanoidMocapX.EditorTools.MotionBricks;
 
 namespace HumanoidMocapX.Inference;
 

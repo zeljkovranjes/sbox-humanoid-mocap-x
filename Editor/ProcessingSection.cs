@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Editor;
-using HumanoidMocapX.EditorTools;
 using Sandbox;
 
 namespace HumanoidMocapX.EditorTools;

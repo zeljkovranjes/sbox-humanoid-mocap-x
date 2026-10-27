@@ -201,10 +201,11 @@ Source: https://github.com/python-pillow/Pillow/blob/main/src/libImaging/Resampl
 Humanoid Mocap
 --------------
 
-`Code/HumanoidMocap` and `Editor/HumanoidMocap` are copied from Humanoid Mocap
-at `0540875` together with its unpublished working-tree changes, so this
-library does not depend on that package. The root namespace is renamed to
-`HumanoidMocapX` and the copy's own View menu entry is removed. Humanoid
+`Code/HumanoidMocap` and `Editor/HumanoidMocap` hold the parts of Humanoid Mocap
+this workspace uses, copied at `0540875` with its unpublished working-tree
+changes, so this library does not depend on that package. The root namespace is
+renamed to `HumanoidMocapX`; its first-person, hand, phone, MotionBricks and
+native-worker features are not included. Humanoid
 Mocap's retargeting, cleanup and export code was adapted from the author's
 `humanoid-retargeter` at `69ccfcd76f6aecca443f055be912ac3831a64003`, and its
 window layout follows `sbox-humanoid-rigger` at
@@ -214,44 +215,11 @@ s&box APIs and conventions in Facepunch/sbox-public at
 
 Source: https://github.com/zeljkovranjes/sbox-humanoid-mocap
 
-The QR generator in `Editor/HumanoidMocap/PhoneQr` comes from
-manuelbl/QrCodeGenerator v2.0.7 at `f414417201fa7c639463730fe41099528f8026cb`.
-Its copyright headers and MIT license
-([LICENSE](Editor/HumanoidMocap/PhoneQr/LICENSE)) are retained; only the
-namespace is adapted.
-
-Source: https://github.com/manuelbl/QrCodeGenerator
-
-The MediaPipe hand crop, landmark projection and the palm-box merge in
-`Code/HumanoidMocap/Core/Inference/PalmDetectionFilter.cs` follow MediaPipe's
-hand-landmarker graph and `NonMaxSuppressionCalculator` at
-`e053c10c0e6c0b30486f43cb349d6daa0ff57d60`, under Apache License 2.0
-([MediaPipe.LICENSE](Editor/HumanoidMocap/Inference/MediaPipe.LICENSE)). The
-hand model is downloaded separately from Google's model storage.
-
-Source: https://github.com/google-ai-edge/mediapipe
-
-The GVHMR temporal network, output statistics, decoder, SMPL-X skeleton and
-contact processing in `Editor/HumanoidMocap/Inference` are adapted from
-zju3dv/GVHMR at `ee960bb6e2ea2d381aa97f08e9b71ef320b624b1`. The upstream
-research/noncommercial terms are retained in
-[Gvhmr.LICENSE](Editor/HumanoidMocap/Inference/Gvhmr.LICENSE). Checkpoints and
-SMPL-X data are downloaded separately.
-
-Source: https://github.com/zju3dv/GVHMR
-
 `Code/HumanoidMocap/Core/Motion/MocapSmooth.cs` ports the zero-phase
 Butterworth and Gaussian smoothing of Dylanyz/MocapSmooth
 (`Tools/smooth_core.py`), Apache License 2.0.
 
 Source: https://github.com/Dylanyz/MocapSmooth
-
-The MotionBricks port in `Editor/HumanoidMocap/MotionBricks` follows
-motion-bricks.cpp. The NVIDIA MotionBricks weights are not bundled; they are
-downloaded on request from LocalAI-io/MotionBricks-G1-GGML at a pinned revision
-and checked against their SHA-256.
-
-Source: https://github.com/localai-org/motion-bricks.cpp
 
 `Code/HumanoidMocap/Core/Cleanup/CcdIk.cs` adapts the CCD iteration, bone gain
 and per-joint constraint callback of DigitalRune `CcdIKSolver.cs` at

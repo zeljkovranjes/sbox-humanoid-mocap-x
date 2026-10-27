@@ -1,6 +1,5 @@
-using HumanoidMocapX.EditorTools.MotionBricks;
-using HumanoidMocapX;
 using HumanoidMocapX.Inference;
+using HumanoidMocapX;
 
 static class DenoiserTests
 {

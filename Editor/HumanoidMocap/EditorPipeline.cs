@@ -196,9 +196,7 @@ public static class EditorPipeline
 		var path = FindLibraryAssetFile( TargetRigJsonRelative )
 			?? throw new FileNotFoundException(
 				$"Target rig definition not found ({TargetRigJsonRelative}). Is Humanoid Mocap X installed?" );
-		// DL weights ride along when the committed model asset exists (enables the
-		// deep-learning fallback solver; null keeps everything else working without it).
-		return RetargetTargetSpec.SboxDefault( File.ReadAllText( path ), DlAssets.TryLoadWeights() );
+		return RetargetTargetSpec.SboxDefault( File.ReadAllText( path ) );
 	}
 
 	/// <summary>
@@ -212,7 +210,7 @@ public static class EditorPipeline
 		var path = FindLibraryAssetFile( CitizenTargetRigJsonRelative )
 			?? throw new FileNotFoundException(
 				$"Citizen target rig definition not found ({CitizenTargetRigJsonRelative}). Is Humanoid Mocap X installed?" );
-		return RetargetTargetSpec.SboxCitizen( File.ReadAllText( path ), DlAssets.TryLoadWeights() );
+		return RetargetTargetSpec.SboxCitizen( File.ReadAllText( path ) );
 	}
 
 	/// <summary>

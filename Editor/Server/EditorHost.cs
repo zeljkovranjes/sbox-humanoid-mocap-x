@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Editor;
-using HumanoidMocapX.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Video;
 using HumanoidMocapX;
 using HumanoidMocapX.EditorTools;
 using Sandbox;

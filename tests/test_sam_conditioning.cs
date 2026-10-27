@@ -1,6 +1,5 @@
-using HumanoidMocapX.EditorTools.MotionBricks;
-using HumanoidMocapX.EditorTools;
 using HumanoidMocapX.Inference;
+using HumanoidMocapX.EditorTools;
 
 static class SamConditioningTests
 {

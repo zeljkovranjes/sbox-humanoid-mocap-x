@@ -1,4 +1,3 @@
-using HumanoidMocapX.EditorTools.MotionBricks;
 using HumanoidMocapX.Inference;
 
 static class SamFixture

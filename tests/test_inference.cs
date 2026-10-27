@@ -1,7 +1,6 @@
 using System.Diagnostics;
-using HumanoidMocapX.EditorTools.MotionBricks;
-using HumanoidMocapX;
 using HumanoidMocapX.Inference;
+using HumanoidMocapX;
 
 static class InferenceTests
 {

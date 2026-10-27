@@ -62,7 +62,6 @@ public sealed partial class RetargetWindow
         var range=PlaybackRange;
         _clock.Text=$"{_playhead:F2} s";
         _timeline.Value=range.Last>range.Start?(float)Math.Clamp((_playhead-range.Start)/(range.Last-range.Start),0,1):0;
-        _contactTimeline?.SetPlayhead(_playhead);
         _playButton.Icon=_playing?"pause":"play_arrow";_playButton.Update();
     }
     void SynchronizePreview()
@@ -72,7 +71,5 @@ public sealed partial class RetargetWindow
         var time=_video?.FrameTime??_playhead;
         var frame=(int)Math.Round((time-_editedMotion.Frames[0].Time)*_previewFps);
         _mocapPreview.Scrub(frame);_mocapPreview.ApplyCurrentFrame();
-        if(_rebuiltPreview.IsValid()){_rebuiltPreview.Scrub(frame);_rebuiltPreview.ApplyCurrentFrame();}
-        UpdateTrackingStatus();
     }
 }

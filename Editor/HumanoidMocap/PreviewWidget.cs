@@ -63,9 +63,6 @@ public sealed partial class PreviewWidget : SceneRenderingWidget
 	HumanoidMocapX.Core.ClipResult _clip;
 	float _time;
 	float _yaw = 35f;
-	float _lookYaw, _lookPitch;
-	Vector3? _handViewDirection;
-	public BoneRole[] FramingHands { get; set; } = new[] { BoneRole.HandL, BoneRole.HandR };
 	Vector2 _lastMouse;
 
 	// ---- target skeleton wireframe (the RETARGETED pose as stick skeleton) --------------
@@ -287,7 +284,6 @@ public sealed partial class PreviewWidget : SceneRenderingWidget
 			{
 				_sceneModel = new SceneModel( world, model, Transform.Zero );
 				_sceneModel.UseAnimGraph = false;
-				ConfigureHeadVisibility();
 				BuildBoneMap( model );
 			}
 		}
@@ -340,7 +336,6 @@ public sealed partial class PreviewWidget : SceneRenderingWidget
 		_time = 0;
 		CurrentFrame = 0;
 		_ghostAlignedClip = null; // ghost anchor depends on this clip's frame 0 - recompute
-		_handViewDirection = null;
 		_framingPath = null;
 	}
 
@@ -388,12 +383,11 @@ public sealed partial class PreviewWidget : SceneRenderingWidget
 		return Vector3.Lerp( path[i], path[j], t - i );
 	}
 
-	/// <summary>Restore capture-camera facing for camera-relative hands and front framing
-	/// for the orbit view. Other hand previews use a fixed clip-wide framing direction.
-	/// This changes only the preview camera, never the captured motion.</summary>
+	/// <summary>Restores front framing for the orbit view. This changes only the preview
+	/// camera, never the captured motion.</summary>
 	public void ResetView()
 	{
-		_yaw = 35; _lookYaw = 0; _lookPitch = 0; _handViewDirection = null;
+		_yaw = 35;
 		if (_clip?.SolvedFrames is not { Count: > 0 } frames) return;
 		var skeleton = _rig.Skeleton;
 		if (TryCharacterBasis(_rig.BoneForRole,skeleton.RestWorld,out _,out _,out var facing,out _,out _))
@@ -404,26 +398,6 @@ public sealed partial class PreviewWidget : SceneRenderingWidget
 			// the apparent clavicle span, even when every joint is at rig-rest width.
 			_yaw=MathF.Atan2(direction.y,direction.x)*180/MathF.PI;
 		}
-		// Camera-relative captures already define the view's placement and facing.
-		// Aiming at their mean wrist position tilts a full-body FPS camera into its
-		// own torso/upper arms and changes the apparent direction of the performance.
-		// Retain explicit view pitch/FOV and mouse look, but reset to the capture view.
-		if (CaptureView is not null) { UpdateCamera(); return; }
-		var scratch = new XForm[skeleton.Count];
-		var hands = FramingHands.Select(_rig.BoneForRole).Where(i=>i.HasValue).Select(i=>i.Value).ToArray();
-		var sum = Vector3.Zero; var count = 0;
-		for (var f = 0; f < frames.Count; f += Math.Max(1, frames.Count / 120))
-		{
-			for (var b=0;b<scratch.Length;b++)
-				scratch[b]=skeleton[b].ParentIndex<0?frames[f][b]:XForm.Compose(scratch[skeleton[b].ParentIndex],frames[f][b]);
-			var eye = _rig.BoneForRole(BoneRole.Head) is int head ? RigWorldToEngine(scratch[head]).Position : new Vector3(0,0,64);
-			foreach(var hand in hands)
-			{
-				var direction=RigWorldToEngine(scratch[hand]).Position-eye;
-				if(direction.Length>1){sum+=direction.Normal;count++;}
-			}
-		}
-		if(count>0&&sum.Length>.01f)_handViewDirection=sum.Normal;
 		UpdateCamera();
 	}
 
@@ -1139,41 +1113,8 @@ public sealed partial class PreviewWidget : SceneRenderingWidget
 	{
 		if ( !Camera.IsValid() )
 			return;
-		Camera.FieldOfView = FirstPerson ? Math.Clamp( ViewmodelFov, 35, 120 ) : 45;
-		Camera.ZNear = FirstPerson ? Math.Clamp( ViewmodelNearClipCm, .1f, 50 ) * .3937008f : 1f;
-		if ( FirstPerson )
-		{
-			var head = _rig.BoneForRole( BoneRole.Head );
-			var position = head is int h && _worldScratch is not null
-				? RigWorldToEngine( _worldScratch[h] ).Position : new Vector3( 0, 0, 64 );
-			var forward = Vector3.Forward;
-			var up = Vector3.Up;
-			if ( _worldScratch is not null && TryCharacterBasis( _rig.BoneForRole, _worldScratch,
-				out _, out var rigUp, out var rigForward, out _, out _ ) )
-			{
-				var origin = RigWorldToEngine( XForm.Identity ).Position;
-				forward = (RigWorldToEngine( new XForm( rigForward, System.Numerics.Quaternion.Identity ) ).Position - origin).Normal;
-				up = (RigWorldToEngine( new XForm( rigUp, System.Numerics.Quaternion.Identity ) ).Position - origin).Normal;
-			}
-			if ( CaptureView is { } capture )
-			{
-				var cameraRotation = YUpToZUp * System.Numerics.Quaternion.CreateFromYawPitchRoll(
-					capture.CaptureCameraYawDegrees * MathF.PI / 180, capture.CaptureCameraPitchDegrees * MathF.PI / 180, 0 );
-				var p = VecN.Transform( capture.CaptureCameraPosition * 39.3700787f, YUpToZUp );
-				var f = VecN.Transform( -VecN.UnitZ, cameraRotation );
-				var u = VecN.Transform( VecN.UnitY, cameraRotation );
-				position = new Vector3( p.X, p.Y, p.Z );
-				forward = new Vector3( f.X, f.Y, f.Z ); up = new Vector3( u.X, u.Y, u.Z );
-			}
-			Camera.WorldPosition = CaptureView is null ? position + forward * 3 : position;
-			forward = _handViewDirection ?? forward;
-			var yaw = _lookYaw * MathF.PI / 180f;
-			var right = Vector3.Cross(forward,up).Normal;
-			forward = (forward*MathF.Cos(yaw)+right*MathF.Sin(yaw)).Normal;
-			var pitch = Math.Clamp( ViewmodelPitch + _lookPitch, -70, 70 ) * MathF.PI / 180f;
-			Camera.WorldRotation = Rotation.LookAt( (forward * MathF.Cos( pitch ) - up * MathF.Sin( pitch )).Normal, up );
-			return;
-		}
+		Camera.FieldOfView = 45;
+		Camera.ZNear = 1f;
 
 		// Frame the POSED character, not the model asset: Model.Bounds is the bind-pose box
 		// anchored at the scene origin, so clips that start offset or travel (BVH mocap
@@ -1194,34 +1135,13 @@ public sealed partial class PreviewWidget : SceneRenderingWidget
 		Camera.WorldRotation = Rotation.LookAt( -dir, Vector3.Up );
 	}
 
-	public float ViewmodelFov { get; set; } = 75;
-	public float ViewmodelPitch { get; set; } = 35;
-	public float ViewmodelNearClipCm { get; set; } = 15;
-	/// <summary>Optional user-assumed capture placement for camera-relative hand clips.
-	/// The viewmodel FOV and additional preview pitch remain independently editable.</summary>
-	public Core.Motion.TargetCorrectionSettings CaptureView { get; set; }
-
 	protected override void OnMouseMove( MouseEvent e )
 	{
 		base.OnMouseMove( e );
 		var delta = e.LocalPosition - _lastMouse;
 		_lastMouse = e.LocalPosition;
 		if ( (e.ButtonState & MouseButtons.Left) != 0 )
-		{
-			if(FirstPerson){_lookYaw=Math.Clamp(_lookYaw+delta.x*.25f,-100,100);_lookPitch=Math.Clamp(_lookPitch+delta.y*.25f,-70,70);}
-			else _yaw -= delta.x * 0.4f;
-			ViewChanged?.Invoke();
-		}
-	}
-
-	/// <summary>Raised when the user turns the view by dragging; a preview shown beside this one can follow with <see cref="CopyViewFrom"/>.</summary>
-	public Action ViewChanged { get; set; }
-	/// <summary>Takes the orbit angle and head-cam look direction of <paramref name="other"/>, so two previews side by side turn together.</summary>
-	public void CopyViewFrom( PreviewWidget other )
-	{
-		if ( other is null ) return;
-		_yaw = other._yaw; _lookYaw = other._lookYaw; _lookPitch = other._lookPitch;
-		UpdateCamera();
+			_yaw -= delta.x * 0.4f;
 	}
 
 	public override void OnDestroyed()

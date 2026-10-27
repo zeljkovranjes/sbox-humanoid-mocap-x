@@ -2,7 +2,6 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 using System;
 using System.Threading;
-using HumanoidMocapX.EditorTools.MotionBricks;
 
 namespace HumanoidMocapX.Inference;
 

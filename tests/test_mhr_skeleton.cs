@@ -1,9 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
-using HumanoidMocapX.EditorTools.Inference;
-using HumanoidMocapX.EditorTools.MotionBricks;
-using HumanoidMocapX.EditorTools;
 using HumanoidMocapX.Inference;
+using HumanoidMocapX.EditorTools;
 
 static class MhrSkeletonTests
 {

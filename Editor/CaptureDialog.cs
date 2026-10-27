@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Editor;
-using HumanoidMocapX.EditorTools;
 using Sandbox;
 
 namespace HumanoidMocapX.EditorTools;

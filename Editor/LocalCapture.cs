@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using HumanoidMocapX.Core.Motion;
-using HumanoidMocapX.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Video;
 
 namespace HumanoidMocapX.EditorTools;
 

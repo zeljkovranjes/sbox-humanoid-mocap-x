@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Sandbox;
-using HumanoidMocapX.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Video;
 
 namespace HumanoidMocapX.EditorTools;
 

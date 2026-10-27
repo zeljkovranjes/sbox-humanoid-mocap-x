@@ -6,12 +6,9 @@ using System.Numerics;
 using System.Text;
 using HumanoidMocapX.Core.Cleanup;
 using HumanoidMocapX.Core.Formats;
-using HumanoidMocapX.Core.Formats.Ant;
-using HumanoidMocapX.Core.Formats.Bvh;
 using HumanoidMocapX.Core.Formats.Dmx;
 using HumanoidMocapX.Core.Formats.Fbx;
 using HumanoidMocapX.Core.Formats.Gltf;
-using HumanoidMocapX.Core.Formats.Renderware;
 using HumanoidMocapX.Core.Mapping;
 using HumanoidMocapX.Core.Maths;
 using HumanoidMocapX.Core.Skeleton;
@@ -34,10 +31,9 @@ using Vector3 = System.Numerics.Vector3; // s&box compat: shadow engine's global
 /// <remarks>
 /// Pipeline per clip:
 /// <list type="number">
-/// <item><b>Import</b> — format by file extension (<c>.fbx</c>/<c>.bvh</c>/<c>.glb</c>/
-/// <c>.gltf</c>/<c>.vrm</c>/<c>.anm</c>/<c>.an5</c>/<c>.cba</c>), content sniff as fallback →
-/// <see cref="SourceScene"/> (cm, native axes). RenderWare and EA ANT animations additionally
-/// take companion skeleton bytes via <see cref="RetargetRequest.SkeletonData"/>.</item>
+/// <item><b>Import</b> — format by file extension (<c>.hmotion</c>/<c>.fbx</c>/<c>.glb</c>/
+/// <c>.gltf</c>/<c>.vrm</c>), content sniff as fallback → <see cref="SourceScene"/> (cm,
+/// native axes).</item>
 /// <item><b>Mapping</b> — per request: <see cref="RetargetRequest.MappingOverride"/> wins;
 /// else <see cref="ProfileDetector.Detect"/> over the preset library (user presets are
 /// loaded Editor-side and arrive as overrides); else <see cref="AutoMapper.Map"/> as best
@@ -322,11 +318,11 @@ public static class Retargeter
     /// multi-take file into one entry per take. Throws <see cref="FormatException"/> when
     /// the file is unreadable.
     /// </summary>
-    public static InspectResult Inspect(byte[] sourceData, string fileName, byte[]? skeletonData = null)
+    public static InspectResult Inspect(byte[] sourceData, string fileName)
     {
         ArgumentNullException.ThrowIfNull(sourceData);
         ArgumentNullException.ThrowIfNull(fileName);
-        var scene = ImportSource(sourceData, fileName, skeletonData: skeletonData);
+        var scene = ImportSource(sourceData, fileName);
         var takeNames = new List<string>(scene.Clips.Count);
         foreach (var clip in scene.Clips)
             takeNames.Add(clip.Name);
@@ -353,7 +349,7 @@ public static class Retargeter
         try
         {
             scene = ImportSource(
-                request.SourceData, request.SourceFileName, request.SampleFps, request.SkeletonData,
+                request.SourceData, request.SourceFileName, request.SampleFps,
                 request.ExternalBufferResolver);
             (map, report) = ResolveMapping(
                 scene.Skeleton, request.MappingOverride, authoredMapping: scene.AuthoredMapping);
@@ -775,18 +771,15 @@ public static class Retargeter
         SourceScene scene, MappingResult map, MappingReportInfo report, int take, string clipName)
     {
         var requested = request.Solve ?? new SolveOptions();
-        var handCapture = Motion.HandCaptureRetargeter.Supports(scene, map);
         if(request.MocapCorrections is {} wristSettings)
         {
             Motion.WristPositionOffsets.Validate(wristSettings.WristOffsets);
-            if(!handCapture&&wristSettings.WristOffsets.Any(e=>e.Enabled))
+            if(wristSettings.WristOffsets.Any(e=>e.Enabled))
                 throw new NotSupportedException("Manual wrist offsets currently require camera-relative hand capture.");
-            if(handCapture&&wristSettings.WristOffsets.Any(e=>e.Enabled))
-                AddNote(report,"Manual wrist position offsets are target edits, not reconstructed observations. Captured rotations and finger motion are retained; confirmed prop contacts and target reach limits take priority. Original missing-hand labels are preserved.");
         }
-        if(!handCapture&&scene.CaptureContacts?.Contacts.Any(c=>c.Review==Motion.ContactReview.Confirmed&&!string.IsNullOrEmpty(c.Object))==true)
+        if(scene.CaptureContacts?.Contacts.Any(c=>c.Review==Motion.ContactReview.Confirmed&&!string.IsNullOrEmpty(c.Object))==true)
             throw new NotSupportedException("Confirmed prop constraints currently require camera-relative hand capture. Disable those constraints to preview body motion; object tracks remain available in captured-skeleton export.");
-        var captureClavicleDirections = !handCapture && scene.CaptureSpace is not null && requested.TransferModes is null;
+        var captureClavicleDirections = scene.CaptureSpace is not null && requested.TransferModes is null;
         if (captureClavicleDirections)
         {
             // Body-model collar joints are not the target's anatomical rest carriage.
@@ -795,11 +788,7 @@ public static class Retargeter
             // Human's already-level collar line lowers its shoulders a second time.
             AddNote(report, "Full-body capture transfers observed clavicle directions while retaining target bone lengths and attachment positions.");
         }
-        var solved = handCapture
-            ? Motion.HandCaptureRetargeter.Solve(scene, map, target.Rig, target.UpAxis,
-                request.MocapCorrections ?? Motion.TargetCorrectionSettings.ForRig(target.Rig,target.UpAxis), take, clipName, requested.TransferFingers,
-                diagnostic: note=>AddNote(report,note))
-            : ResolveSolver(request, target, context, report).Solve(scene, map, target.Rig, new SolveOptions
+        var solved = new GeometricSolver().Solve(scene, map, target.Rig, new SolveOptions
         {
             GroundedLegDirections = request.FootPlantCleanup,
             HipScaleHorizontal = requested.HipScaleHorizontal,
@@ -817,7 +806,7 @@ public static class Retargeter
             PassThroughSourceTranslations(scene, target.Rig, frames, take, report);
 
         // ---- foot-plant cleanup (target space; up axis from the TARGET character frame) ----
-        if (request.FootPlantCleanup && !handCapture)
+        if (request.FootPlantCleanup)
         {
             if (context.Up is { } up && context.FootChains is { } feet)
             {
@@ -858,7 +847,7 @@ public static class Retargeter
         }
 
         // A reconstructed body has no finger tracks; give its hands a resting shape, not the bind pose.
-        if(scene.CaptureSpace is not null&&!handCapture)
+        if(scene.CaptureSpace is not null)
         {
             if(Motion.CaptureSpineSpread.Apply(frames,target.Rig)>0)AddNote(report,"Spine: each frame's bend from the hips to the chest is shared evenly between the spine bones; the network puts most of it in the lowest one. Chest, head and arms are unchanged.");
             var shoulders=Motion.CaptureShoulderCarriage.Apply(frames,scene.Clips[take].Frames,scene.Skeleton,map,target.Rig);
@@ -874,7 +863,7 @@ public static class Retargeter
 
         // ---- optional arm effector IK (default off: the solver already matches anatomical
         // directions; arm IK is only for reach-critical work) ----
-        if (request.ArmEffectorIk && !handCapture)
+        if (request.ArmEffectorIk)
         {
             var problem = ArmIkCleanup.Apply(frames, scene, map, target.Rig, context, take);
             if (problem is not null)
@@ -882,7 +871,7 @@ public static class Retargeter
         }
 
         // ---- root motion (see class remarks for the Extract ↔ ExtractMotion mapping) ----
-        if(request.FootPlantCleanup&&!handCapture&&(request.MocapCorrections?.StabilizeFeet??true))
+        if(request.FootPlantCleanup&&(request.MocapCorrections?.StabilizeFeet??true))
         {
             var anchored=Motion.CaptureContactRoot.Apply(frames,scene,map,target.Rig,target.UpAxis);
             if(anchored>0)AddNote(report,FormattableString.Invariant($"Travel from contacts: planted feet no longer slide; the body's travel was corrected by up to {anchored:F0} cm to match them."));
@@ -903,18 +892,17 @@ public static class Retargeter
             }
         }
         // Last of the leg work: no thigh, shin or foot turns far more in one frame than around it.
-        if(scene.CaptureSpace is not null&&!handCapture&&Motion.CaptureLegSnaps.Apply(frames,target.Rig,solved.Fps,target.UpAxis==TargetUpAxis.ZUpEngine?39.3700787f:100f,PlantedFeet(scene,map,frames.Count)) is var snaps&&snaps>0)
+        if(scene.CaptureSpace is not null&&Motion.CaptureLegSnaps.Apply(frames,target.Rig,solved.Fps,target.UpAxis==TargetUpAxis.ZUpEngine?39.3700787f:100f,PlantedFeet(scene,map,frames.Count)) is var snaps&&snaps>0)
             AddNote(report,$"Leg continuity corrected in {snaps} samples: isolated rotation or knee-position jolts were spread over neighbouring frames, preserving foot anchors where the constraints allowed.");
         ApplyRootMotion(request.RootMotion, frames, context, report);
 
         if (request.MocapCorrections is { } corrections)
         {
-            if (!handCapture || !corrections.FirstPerson)
-                Motion.TargetCorrections.Apply(frames, target.Rig, target.UpAxis, corrections);
+            Motion.TargetCorrections.Apply(frames, target.Rig, target.UpAxis, corrections);
             if (corrections.FirstPerson) AddNote(report, "Shoulders and elbows are generated target-rig IK, not measured joints.");
         }
 
-        if (scene.CaptureSpace is not null && !handCapture)
+        if (scene.CaptureSpace is not null)
         {
             var clearance = Motion.CaptureArmClearance.Apply(frames, scene.Clips[take].Frames, scene.Skeleton, map,
                 target.Rig, solved.Fps, out var unresolvedContacts, out var maximumPenetration);
@@ -923,10 +911,6 @@ public static class Retargeter
             if (unresolvedContacts > 0)
                 AddNote(report, FormattableString.Invariant($"Torso contact remains unresolved in {unresolvedContacts} hand samples (up to {maximumPenetration:F3} target units). Fixed arm lengths and wrist attitude prevented a clear proxy pose; review these contacts."));
         }
-
-        if (handCapture) AddNote(report, "Camera-relative hand capture uses editable camera placement and target-proportion arm IK. Shoulders and elbows are estimated; unreachable wrists are clamped without stretching bones. Unobserved hands hold their last pose.");
-        if(handCapture&&scene.CaptureContacts?.Contacts.Any(c=>c.FingerTargets.Count>0)==true)
-            AddNote(report,"Authored finger points apply bounded hinge corrections after arm IK only on their matching target rig and confirmed intervals. Other fingers retain captured articulation. Points are not measured skin surfaces; residual gaps and penetration may remain.");
 
         // ---- IK helper bones (root_IK, IK targets, ikrule) need real baked channels ----
         if (context.HasIkBakedBones)
@@ -1401,36 +1385,6 @@ public static class Retargeter
     }
 
     /// <summary>
-    /// Picks the solver for a request (design §10 routing): the
-    /// <see cref="GeometricSolver"/> unless the request selects
-    /// <see cref="SolverKind.DeepLearning"/>, which needs the spec's
-    /// <see cref="RetargetTargetSpec.DlWeights"/> and is built once per batch (the parsed
-    /// model is cached on the <see cref="TargetContext"/>). A DL request also notes that
-    /// per-role mapping is ignored by that solver.
-    /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown (and surfaced as the clip's
-    /// error) when DL is requested without weights.</exception>
-    private static IRetargetSolver ResolveSolver(
-        RetargetRequest request, RetargetTargetSpec target, TargetContext context,
-        MappingReportInfo report)
-    {
-        if (request.Solver != SolverKind.DeepLearning)
-            return new GeometricSolver();
-
-        if (target.DlWeights is not { Length: > 0 })
-        {
-            throw new InvalidOperationException(
-                "Deep-learning solver requested but RetargetTargetSpec.DlWeights is not set "
-                + "(read Assets/data/humanoid_mocap/dl/same_v1.weights and pass its bytes).");
-        }
-
-        AddNote(report,
-            "Deep-learning solver (SAME, experimental): skeleton-agnostic — per-role mapping "
-            + "is not used (hips/alignment heuristics only); finger bones stay at rest.");
-        return context.GetDlSolver(target.DlWeights);
-    }
-
-    /// <summary>
     /// Normalized-rest foot pitch beyond which (toe approaching/above ankle level) the rest
     /// cannot be a flat stance — measured stance rests sit at −11°…−51°; the repro artifact
     /// rig measured +2.7° on one foot.
@@ -1830,7 +1784,7 @@ public static class Retargeter
     /// <summary>
     /// Imports source-file bytes exactly like conversion does: the extension picks the
     /// importer; unknown extensions fall back to content sniffing (FBX binary magic / ASCII
-    /// header token / BVH "HIERARCHY" / GLB 'glTF' magic / glTF JSON). Public so UI listings
+    /// header token / GLB 'glTF' magic / glTF JSON). Public so UI listings
     /// inspect files through the SAME import path the pipeline uses (no duplicate sniffing
     /// logic caller-side).
     /// </summary>
@@ -1838,20 +1792,16 @@ public static class Retargeter
     /// <param name="fileName">File name; only the extension is consulted.</param>
     /// <param name="sampleFps">Resample rate for the imported clips; null = importer default
     /// (30 fps).</param>
-    /// <param name="skeletonData">Companion skeleton bytes for animation-only formats
-    /// (RenderWare .anm/.an5 need the model .dff — see
-    /// <see cref="RetargetRequest.SkeletonData"/>); ignored by self-contained formats.</param>
     /// <exception cref="FormatException">Thrown when the bytes are not a readable
-    /// FBX/BVH/glTF/RenderWare animation.</exception>
+    /// motion, FBX or glTF animation.</exception>
     public static SourceScene ImportSource(
-        byte[] data, string fileName, float? sampleFps = null, byte[]? skeletonData = null,
+        byte[] data, string fileName, float? sampleFps = null,
         Func<string, byte[]>? externalBufferResolver = null)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(fileName);
 
         var fbxOptions = sampleFps is { } fbxFps ? new FbxImportOptions { SampleFps = fbxFps } : null;
-        var bvhOptions = sampleFps is { } bvhFps ? new BvhImportOptions { SampleFps = bvhFps } : null;
         var gltfOptions = sampleFps is not null || externalBufferResolver is not null
             ? new GltfImportOptions
             {
@@ -1859,44 +1809,21 @@ public static class Retargeter
                 ExternalBufferResolver = externalBufferResolver,
             }
             : null;
-        // RenderWare banks carry no clip names — takes are named from the file stem.
-        var rwOptions = new RwAnmImportOptions
-        {
-            SampleFps = sampleFps ?? 30f,
-            ClipNameBase = FileStem(fileName),
-        };
-        // EA ANT packages carry no clip names and bind channels to joints by index; the
-        // companion joint table arrives the same way RenderWare's .dff does.
-        var antOptions = new AntImportOptions
-        {
-            SampleFps = sampleFps ?? 30f,
-            ClipNameBase = FileStem(fileName),
-        };
         var ext = ExtensionOf(fileName);
         return ext switch
         {
             "hmotion" => Motion.MotionDocument.Parse(data).ToSourceScene(sampleFps),
             "fbx" => FbxImporter.Import(data, fbxOptions),
-            "bvh" => BvhImporter.Import(data, bvhOptions),
             // .vrm = glTF 2.0 GLB container + VRM extension (the importer reads the authored
             // humanoid bone map into SourceScene.AuthoredMapping); unknown-extension VRM
             // bytes also land here via the GLB magic sniff below.
             "glb" or "gltf" or "vrm" => GltfImporter.Import(data, gltfOptions),
-            // RenderWare animations (FSB2 .anm single clips / .an5 banks); the skeleton
-            // comes from the companion model .dff (a missing skeleton throws the
-            // importer's instructive error).
-            "anm" or "an5" => RwAnmImporter.Import(data, skeletonData, rwOptions),
-            // EA ANT animation packages (EA Canada titles; verified on Fight Night Champion).
-            "cba" => AntImporter.Import(data, skeletonData, antOptions),
             _ => SniffFormat(data) switch
             {
                 "fbx" => FbxImporter.Import(data, fbxOptions),
-                "bvh" => BvhImporter.Import(data, bvhOptions),
                 "gltf" => GltfImporter.Import(data, gltfOptions),
-                "rwanim" => RwAnmImporter.Import(data, skeletonData, rwOptions),
-                "ant" => AntImporter.Import(data, skeletonData, antOptions),
                 _ => throw new FormatException(
-                    $"Unrecognized source format for '{fileName}' (expected .fbx, .bvh, .glb, .gltf, .vrm, .anm, .an5 or .cba)."),
+                    $"Unrecognized source format for '{fileName}' (expected .hmotion, .fbx, .glb, .gltf or .vrm)."),
             },
         };
     }
@@ -1908,10 +1835,6 @@ public static class Retargeter
         if (StartsWithAscii(data, fbxMagic))
             return "fbx";
 
-        // EA ANT stream magic (.cba animation packages).
-        if (StartsWithAscii(data, AntStream.StreamTag))
-            return "ant";
-
         // GLB magic: 'glTF' (0x46546C67 little-endian).
         if (StartsWithAscii(data, "glTF"))
             return "gltf";
@@ -1920,15 +1843,9 @@ public static class Retargeter
         if (head.Contains("FBXHeaderExtension", StringComparison.Ordinal))
             return "fbx"; // ASCII FBX
         var trimmed = head.TrimStart();
-        if (trimmed.StartsWith("HIERARCHY", StringComparison.OrdinalIgnoreCase))
-            return "bvh";
         if (trimmed.StartsWith("{", StringComparison.Ordinal)
             && head.Contains("\"asset\"", StringComparison.Ordinal))
             return "gltf"; // plain-JSON glTF
-
-        // RenderWare animation stream (.anm single clip / .an5 take container).
-        if (RwAnmImporter.LooksLikeRenderwareAnim(data))
-            return "rwanim";
         return null;
     }
 
@@ -2248,13 +2165,6 @@ public static class Retargeter
         /// constraint re-drives them in a compiled sequence (channel-less face joints
         /// bake statically — eyes detach from the moving head in ModelDoc).</summary>
         public IReadOnlySet<int>? ConstraintDrivenBones { get; }
-
-        private Dl.DlSolver? _dlSolver;
-
-        /// <summary>The batch-shared deep-learning solver, parsing <paramref name="weights"/>
-        /// once on first use (the batch runs requests sequentially — no locking needed).</summary>
-        public IRetargetSolver GetDlSolver(byte[] weights)
-            => _dlSolver ??= new Dl.DlSolver(weights);
 
         public TargetContext(TargetRig rig)
         {

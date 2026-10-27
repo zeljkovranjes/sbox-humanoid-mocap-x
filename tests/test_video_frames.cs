@@ -1,4 +1,4 @@
-using HumanoidMocapX.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Video;
 using HumanoidMocapX.EditorTools;
 using HumanoidMocapX.Inference;
 

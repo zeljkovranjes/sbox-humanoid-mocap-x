@@ -1,10 +1,8 @@
 using System.IO.Compression;
 using System.Runtime.InteropServices;
-using HumanoidMocapX.EditorTools.Inference;
-using HumanoidMocapX.EditorTools.MotionBricks;
+using HumanoidMocapX.Inference;
 using HumanoidMocapX;
 using HumanoidMocapX.EditorTools;
-using HumanoidMocapX.Inference;
 
 static class CheckpointTests
 {

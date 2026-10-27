@@ -13,53 +13,32 @@ namespace HumanoidMocapX.EditorTools;
 /// <summary>Video capture, synchronized preview and armature animation export.</summary>
 public sealed partial class RetargetWindow : Widget
 {
-    public const string DockTitle = "Humanoid Mocap";
-    static RetargetWindow _instance;
-    public static RetargetWindow Instance => _instance.IsValid() ? _instance : null;
     TargetPickers.ResolvedTarget _target;
     string _targetError;
     RootMotionMode _rootMotion = RootMotionMode.Off;
 
-    public RetargetWindow(Widget parent) : this(parent, DockTitle, null, null, false) { }
-
-    RetargetWindow(Widget parent, string title, HumanoidMocapX.Core.Motion.IBodyCapture bodyCapture,
-        Action<Widget> captureSettings, bool thirdPersonOnly) : base(parent)
+    /// <summary>Creates the workspace around an injected body capture backend. The settings
+    /// callback adds backend controls to Mocap adjustments. Null backends are rejected.</summary>
+    public RetargetWindow(Widget parent, string title, HumanoidMocapX.Core.Motion.IBodyCapture bodyCapture,
+        Action<Widget> captureSettings = null) : base(parent)
     {
-        _bodyCapture = bodyCapture; _captureSettings = captureSettings;
-        if (!thirdPersonOnly && !_instance.IsValid()) _instance = this;
-        Name = thirdPersonOnly ? "HumanoidMocapX" : "HumanoidMocap";
+        _bodyCapture = bodyCapture ?? throw new ArgumentNullException(nameof(bodyCapture));
+        _captureSettings = captureSettings;
+        Name = "HumanoidMocapX";
         WindowTitle = title; SetWindowIcon("videocam");
         MinimumSize = new Vector2(760, 480);
         Size = new Vector2(960, 640);
         Layout = Layout.Column();
         BuildMocapUi();
-        if (thirdPersonOnly) SetWorkspace(false);
-        if(!thirdPersonOnly && s_chosenTarget is { } chosen)
-        {_target=chosen;_targetChosen=true;FitMocapPlacementToTarget();RefreshTargetPickers();RefreshStatus();}
-        else
-        {
-            TrySelectSboxTarget();
-            // The window opens in First Person, which animates the viewmodel arms games use.
-            if(_firstPerson)UseFirstPersonArms(false);
-        }
-    }
-    public static RetargetWindow Open()
-    {
-        if (Instance is { } existing)
-        {existing.GetWindow().Show();existing.Show();existing.GetWindow().Raise();return existing;}
-        var dialog=new Dialog(null);dialog.Window.Title=DockTitle;dialog.Window.SetWindowIcon("videocam");
-        dialog.Layout=Layout.Column();var window=dialog.Layout.Add(new RetargetWindow(dialog),1);
-        dialog.Window.MinimumSize=new Vector2(760,480);dialog.Window.Size=new Vector2(960,640);
-        dialog.Show();return window;
+        TrySelectSboxTarget();
     }
     public override void OnDestroyed()
     {
         _processing?.Cancel();
         if (_adjustments.IsValid()) _adjustments.Window.Destroy();
-        if (_instance == this) _instance = null;
         base.OnDestroyed();
     }
-    string NormalizedOutputFolder() => HasBodyCapture ? "animations/humanoid_mocap_x" : "animations/humanoid_mocap";
+    static string NormalizedOutputFolder() => "animations/humanoid_mocap_x";
     protected override void OnPaint()
     {
         // Paint only this surface; an inherited CSS background obscures the native
@@ -136,7 +115,7 @@ public sealed partial class RetargetWindow : Widget
 	void ApplyPickedTarget( TargetPickers.ResolvedTarget resolved, string error,
 		TargetPickers.RejectedTarget rejected = null )
 	{
-		_targetRequests++;_targetChosen=true;
+
 		if ( resolved is null )
 		{
 			// Skeleton loaded but wasn't auto-recognized: any humanoid-LIKE rig (a paw,
@@ -153,7 +132,7 @@ public sealed partial class RetargetWindow : Widget
 			return;
 		}
 
-		_target = resolved;RememberChosenTarget();
+		_target = resolved;
 		RefreshTargetPickers();
 		FitMocapPlacementToTarget();
 		_targetError = null;

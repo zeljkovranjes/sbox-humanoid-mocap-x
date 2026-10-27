@@ -31,55 +31,6 @@ an existing full-body `.hmotion` capture.
 
 <br>
 
-## Details
-
-- Human is the initial target. Classic Citizen and custom VMDL, FBX and GLB
-  targets use the built-in retargeter. Exported FBX uses ModelDoc import scale 1.
-- Humanoid Mocap's code is copied into `Code/HumanoidMocap` and
-  `Editor/HumanoidMocap` under the `HumanoidMocapX` namespace, so both packages
-  can be installed side by side without type or menu collisions.
-- Foot locking is enabled by default for target retargeting. Source-skeleton
-  export preserves the capture without target corrections.
-- Settings > **Processing > Setup** chooses between this computer (download
-  the models) and a provider: enter its address, sign in through the browser,
-  and the editor shows your profile, limits and queue. Capture stays disabled
-  until a choice is saved. Providers send the selected video,
-  Base / Latest choice and camera interval to their host.
-- Providers process videos with the [in-editor host]: the library serves the
-  capture API from an s&box editor on Windows and runs the same GPU pipeline as
-  local capture. The [provider guide] covers the website, sign-in, roles and
-  HTTPS. The standalone C# service `humanoid-mocap-host` (in the release as
-  `humanoid-mocap-host-<version>.zip`) is only a starter for custom processors.
-
-[in-editor host]: docs/editor-host.md
-[provider guide]: docs/provider-guide.md
-- `FlowMotionAdapter` converts validated numeric SMPL-H motion into the shared
-  metre-based format. It does not reconstruct motion from video.
-- **Mocap adjustments > Processing > Setup > Local models** has download
-  buttons for the selected FlowHMR checkpoint, SAM 3D Body DINOv3,
-  VGGT-Omega 1B-512 and YOLOX-L person detection, plus the separate SMPL-H
-  neutral skeleton.
-  Transfers show progress and can be cancelled. Opening the workspace or
-  starting capture does not download weights.
-- Local capture uses Windows Media Foundation, including H.264 decoding.
-  Its production integration still needs a Windows acceptance run. Linux
-  supports WebM preview, saved-motion export and hosted capture; its engine
-  preview decoder cannot yet supply a reliable inference timeline.
-
-Build commands and remaining work are in [development].
-
-The [web example] adds Discord OAuth to a processing host. The [video checks]
-record the first five-second predecoded GPU capture and Human/Citizen exports;
-Windows capture and motion-quality acceptance remain unfinished.
-
-[web example]: examples/hosted-web/README.md
-[video checks]: docs/video-validation.md
-Host setup and the HTTP contract are in [DOCUMENT.MD].
-
-[DOCUMENT.MD]: DOCUMENT.MD
-
-<br>
-
 #### License
 
 <sup>
@@ -93,8 +44,7 @@ SAM decoder adaptations retain the <a href="LICENSE-SAM">SAM License</a>.
 Pillow resampling adaptations retain the
 <a href="LICENSE-PILLOW">MIT-CMU license</a>.
 Code copied from Humanoid Mocap keeps its
-<a href="THIRD_PARTY_NOTICES.md#humanoid-mocap">notices</a>, including GVHMR's
-noncommercial terms.
+<a href="THIRD_PARTY_NOTICES.md#humanoid-mocap">notices</a>.
 FlowHMR weights have separate
 <a href="https://huggingface.co/fafsaf1/flowhmr-0.46B#license">non-commercial
 terms</a>. No model weights are bundled.
