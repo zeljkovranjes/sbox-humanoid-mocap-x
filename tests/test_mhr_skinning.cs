@@ -1,5 +1,5 @@
 using System.Numerics;
-using HumanoidMocap.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Inference;
 using HumanoidMocapX.EditorTools;
 using HumanoidMocapX.Inference;
 

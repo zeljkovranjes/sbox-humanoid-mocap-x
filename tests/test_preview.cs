@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
-using HumanoidMocap.Core.Inference;
-using HumanoidMocap.EditorTools.Inference;
+using HumanoidMocapX.Core.Inference;
+using HumanoidMocapX.EditorTools.Inference;
 
 static class PreviewTests
 {

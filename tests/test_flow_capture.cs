@@ -1,4 +1,4 @@
-using HumanoidMocap.Core.Motion;
+using HumanoidMocapX.Core.Motion;
 using HumanoidMocapX;
 using HumanoidMocapX.EditorTools;
 

@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Runtime.InteropServices;
-using HumanoidMocap.EditorTools.Inference;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.MotionBricks;
 using HumanoidMocapX;
 using HumanoidMocapX.EditorTools;
 using HumanoidMocapX.Inference;

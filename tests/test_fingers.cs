@@ -1,12 +1,12 @@
 using System.Numerics;
 using System.Text;
-using HumanoidMocap.Core;
+using HumanoidMocapX.Core;
 using HumanoidMocapX;
-using HumanoidMocap.Core.Formats.Fbx;
-using HumanoidMocap.Core.Mapping;
-using HumanoidMocap.Core.Maths;
-using HumanoidMocap.Core.Motion;
-using HumanoidMocap.Core.Target;
+using HumanoidMocapX.Core.Formats.Fbx;
+using HumanoidMocapX.Core.Mapping;
+using HumanoidMocapX.Core.Maths;
+using HumanoidMocapX.Core.Motion;
+using HumanoidMocapX.Core.Target;
 
 static class FingerTests
 {

@@ -1,4 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><AssemblyName>package.notpointless.chomnr_humanoid_mocap</AssemblyName></PropertyGroup>
-  <ItemGroup><Compile Include="$(MocapRoot)/Code/**/*.cs" Exclude="$(MocapRoot)/Code/obj/**;$(MocapRoot)/Code/Properties/**" /></ItemGroup>
-</Project>

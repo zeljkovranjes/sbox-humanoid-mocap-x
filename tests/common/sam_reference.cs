@@ -1,4 +1,4 @@
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.MotionBricks;
 
 static class SamReference
 {

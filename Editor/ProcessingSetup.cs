@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Editor;
-using HumanoidMocap.EditorTools;
+using HumanoidMocapX.EditorTools;
 
 namespace HumanoidMocapX.EditorTools;
 

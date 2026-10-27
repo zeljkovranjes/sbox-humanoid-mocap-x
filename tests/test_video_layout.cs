@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using HumanoidMocap.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Inference;
 
 static class VideoLayoutTests
 {

@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Text;
-using HumanoidMocap.EditorTools.Inference;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.MotionBricks;
 
 static class ScriptCheckpointTests
 {

@@ -1,6 +1,6 @@
 using System;
 using Editor;
-using HumanoidMocap.EditorTools;
+using HumanoidMocapX.EditorTools;
 using Sandbox;
 
 namespace HumanoidMocapX.EditorTools;

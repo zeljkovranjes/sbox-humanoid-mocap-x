@@ -1,8 +1,8 @@
 using System.Numerics;
 using System.Text.Json;
-using HumanoidMocap.Core.Formats.Fbx;
-using HumanoidMocap.Core.Maths;
-using HumanoidMocap.Core.Motion;
+using HumanoidMocapX.Core.Formats.Fbx;
+using HumanoidMocapX.Core.Maths;
+using HumanoidMocapX.Core.Motion;
 
 // Numeric acceptance for a non-byte-identical optimization: compares two ClipChecks result
 // directories. Exits non-zero when any limit is exceeded or a contact decision changes.
@@ -153,7 +153,7 @@ static double Degrees(Quaternion a, Quaternion b)
     return angle;
 }
 
-static XForm[] World(HumanoidMocap.Core.Skeleton.Skeleton skeleton, XForm[] local)
+static XForm[] World(HumanoidMocapX.Core.Skeleton.Skeleton skeleton, XForm[] local)
 {
     var world = new XForm[local.Length];
     for (var bone = 0; bone < local.Length; bone++)

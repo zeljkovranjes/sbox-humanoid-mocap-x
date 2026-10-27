@@ -1,7 +1,7 @@
 // C# adaptation of FlowHMR's MMDoubleStreamBlock. See THIRD_PARTY_NOTICES.md.
 using System;
 using System.Threading;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.MotionBricks;
 
 namespace HumanoidMocapX.Inference;
 

@@ -1,11 +1,11 @@
 using System.Numerics;
 using System.Text.Json;
-using HumanoidMocap.Core;
-using HumanoidMocap.Core.Formats.Fbx;
-using HumanoidMocap.Core.Mapping;
-using HumanoidMocap.Core.Maths;
-using HumanoidMocap.Core.Motion;
-using HumanoidMocap.Core.Target;
+using HumanoidMocapX.Core;
+using HumanoidMocapX.Core.Formats.Fbx;
+using HumanoidMocapX.Core.Mapping;
+using HumanoidMocapX.Core.Maths;
+using HumanoidMocapX.Core.Motion;
+using HumanoidMocapX.Core.Target;
 
 if (args.Length != 3) throw new ArgumentException("Pass capture.hmotion, rig directory and report.json paths.");
 var bytes = await File.ReadAllBytesAsync(args[0]);

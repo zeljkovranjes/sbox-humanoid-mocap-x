@@ -1,4 +1,4 @@
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.MotionBricks;
 using HumanoidMocapX.Inference;
 
 /// <summary>Allocation-heavy, double-precision equations independent of production operators.</summary>

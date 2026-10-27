@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.MotionBricks;
 using HumanoidMocapX;
 using HumanoidMocapX.Inference;
 

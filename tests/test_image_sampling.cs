@@ -1,4 +1,4 @@
-using HumanoidMocap.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Inference;
 
 static class ImageSamplingTests
 {

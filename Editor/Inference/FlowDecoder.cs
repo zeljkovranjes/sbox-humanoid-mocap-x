@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Numerics;
 using System.Threading;
-using HumanoidMocap.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Inference;
 
 namespace HumanoidMocapX.Inference;
 

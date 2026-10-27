@@ -1,10 +1,10 @@
 using System.Numerics;
-using HumanoidMocap.Core.Cleanup;
-using HumanoidMocap.Core.Mapping;
-using HumanoidMocap.Core.Maths;
-using HumanoidMocap.Core.Motion;
-using HumanoidMocap.Core.Skeleton;
-using HumanoidMocap.Core.Target;
+using HumanoidMocapX.Core.Cleanup;
+using HumanoidMocapX.Core.Mapping;
+using HumanoidMocapX.Core.Maths;
+using HumanoidMocapX.Core.Motion;
+using HumanoidMocapX.Core.Skeleton;
+using HumanoidMocapX.Core.Target;
 
 static class BodyClearanceTests
 {

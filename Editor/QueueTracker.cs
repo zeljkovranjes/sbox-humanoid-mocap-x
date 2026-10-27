@@ -5,7 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using HumanoidMocap.EditorTools;
+using HumanoidMocapX.EditorTools;
 
 namespace HumanoidMocapX.EditorTools;
 

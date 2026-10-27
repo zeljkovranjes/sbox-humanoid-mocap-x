@@ -1,7 +1,7 @@
 using System.Numerics;
-using HumanoidMocap.Core.Cleanup;
-using HumanoidMocap.Core.Maths;
-using HumanoidMocap.Core.Skeleton;
+using HumanoidMocapX.Core.Cleanup;
+using HumanoidMocapX.Core.Maths;
+using HumanoidMocapX.Core.Skeleton;
 
 static class CcdIkTests
 {

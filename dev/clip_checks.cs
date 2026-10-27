@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
-using HumanoidMocap.Core;
-using HumanoidMocap.Core.Formats.Fbx;
-using HumanoidMocap.Core.Motion;
-using HumanoidMocap.Core.Target;
+using HumanoidMocapX.Core;
+using HumanoidMocapX.Core.Formats.Fbx;
+using HumanoidMocapX.Core.Motion;
+using HumanoidMocapX.Core.Target;
 using HumanoidMocapX.EditorTools;
 using HumanoidMocapX.Inference;
 using Sandbox;

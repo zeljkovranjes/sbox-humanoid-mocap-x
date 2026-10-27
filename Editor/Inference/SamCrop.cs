@@ -3,7 +3,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
-using HumanoidMocap.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Inference;
 
 namespace HumanoidMocapX.Inference;
 
