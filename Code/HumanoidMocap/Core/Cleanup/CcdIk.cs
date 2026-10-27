@@ -1,3 +1,5 @@
+#nullable enable annotations
+
 // Copyright (c) 2007-2016, DigitalRune GmbH. All rights reserved.
 // Adapted from DigitalRune CcdIKSolver; see DigitalRune.LICENSE and THIRD_PARTY_NOTICES.md.
 using System;

@@ -1,3 +1,5 @@
+#nullable enable annotations
+
 namespace HumanoidMocapX.Core.Motion;
 
 /// <summary>Reconstructs a video range into a validated, metre-based motion document.</summary>
