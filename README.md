@@ -25,8 +25,9 @@ Libraries/tensor-inference/     tensor-inference-<version>.zip from the release
 
 [release]: https://github.com/zeljkovranjes/sbox-humanoid-mocap-x/releases/latest
 
-Open **View > Humanoid Mocap X**, choose where videos are processed, then drop
-in a video. **Advanced** opens Mocap adjustments, where **Open motion…** loads
+On Linux, capturing on this computer also needs FFmpeg (`ffmpeg` and `ffprobe`
+on `PATH`). Open **View > Humanoid Mocap X**, choose where videos are processed,
+then drop in a video. **Advanced** opens Mocap adjustments, where **Open motion…** loads
 an existing full-body `.hmotion` capture.
 
 <br>

@@ -96,10 +96,11 @@ Use **Open folder** to view those files.
 Click a section heading to collapse or expand it; each section remembers
 its previous state.
 
-On Windows, after choosing **This computer**, open a video. Capture verifies installed
-model hashes without contacting a download server. It reuses the built-in Humanoid
-Mocap Windows Media Foundation decoder, including H.264, and samples the
-displayed frames at 30 fps from their presentation timestamps. Missing or
+After choosing **This computer**, open a video. Capture verifies installed
+model hashes without contacting a download server. It decodes with Windows Media
+Foundation on Windows and the system FFmpeg (`ffmpeg` and `ffprobe` on `PATH`)
+on Linux, including H.264, and samples the displayed frames at 30 fps from
+their presentation timestamps. Missing or
 corrupt models produce an error naming the file and its download control.
 
 Temporary decoded pixels retain their original resolution and are removed
@@ -108,10 +109,10 @@ frames and 16 GiB of decoded pixels; select a shorter time range if needed.
 The cache is under `HumanoidMocapX/captures` in local application data. Saved
 `.hmotion` captures remain there for reopening and export.
 
-Windows production capture still needs a live acceptance run. On Linux,
-use hosted capture or open saved motion; WebM preview remains available.
-The Linux preview API returned stale/incomplete pixels in frame-extraction
-tests and is not used for inference. See [GPU validation] for the checks that
+Windows production capture still needs a live acceptance run. On Linux, MP4,
+MOV and M4V files preview through the same FFmpeg decoder; other formats use
+the engine preview, which returned stale/incomplete pixels in frame-extraction
+tests and is never used for inference. See [GPU validation] for the checks that
 have actually passed.
 
 [GPU validation]: docs/gpu-validation.md

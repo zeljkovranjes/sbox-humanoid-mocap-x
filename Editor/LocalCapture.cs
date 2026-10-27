@@ -8,13 +8,14 @@ using HumanoidMocapX.EditorTools.Video;
 
 namespace HumanoidMocapX.EditorTools;
 
-/// <summary>Connects installed models and timestamped Windows decoding to in-editor
-/// GPU inference. No network, external worker or runtime model download is used.</summary>
+/// <summary>Connects installed models and timestamped decoding (Windows Media Foundation, or
+/// the system FFmpeg elsewhere) to in-editor GPU inference. No network, capture worker or
+/// runtime model download is used.</summary>
 internal sealed class LocalCapture(CaptureOptions options, string models, string cache,
     Action<string, double?> reportProgress = null) : IBodyCapture
 {
-    internal const string LinuxUnavailable = "Local video capture needs Windows Media Foundation. Linux preview, saved-motion export and hosted capture remain available.";
-    internal static string Availability => OperatingSystem.IsWindows() ? null : LinuxUnavailable;
+    internal const string FfmpegMissing = "Local video capture on Linux needs FFmpeg: install it so ffmpeg and ffprobe are on PATH.";
+    internal static string Availability => OperatingSystem.IsWindows() || FfmpegVideoDecoder.IsInstalled ? null : FfmpegMissing;
     public string UnavailableReason => Availability;
     int active;
 
@@ -31,7 +32,7 @@ internal sealed class LocalCapture(CaptureOptions options, string models, string
             using var frames = await Task.Run(async () =>
             {
                 cancellationToken.ThrowIfCancellationRequested(); Report("Opening video decoder…");
-                using var decoder = new WindowsVideoDecoder(video);
+                using var decoder = IVideoDecoder.Open(video);
                 var duration = decoder.Duration;
                 if (start > 0) decoder.Seek(start);
                 return await VideoFrames.CreateAsync(decoder.Read, duration, start, end, cache, Report, cancellationToken);

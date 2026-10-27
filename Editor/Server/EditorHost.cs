@@ -69,7 +69,7 @@ public static class EditorHost
     static Task<double> ReadDurationAsync(string video, CancellationToken token) => Task.Run(() =>
     {
         token.ThrowIfCancellationRequested();
-        using var decoder = new WindowsVideoDecoder(video);
+        using var decoder = IVideoDecoder.Open(video);
         return decoder.Duration;
     }, token);
 

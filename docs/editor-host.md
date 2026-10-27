@@ -14,8 +14,9 @@ signed account requests to this loopback listener. See the [provider guide],
 
 ## Requirements
 
-- A running Windows s&box editor with Media Foundation, the library and its
-  tensor-inference dependency installed.
+- A running s&box editor with the library and its tensor-inference dependency
+  installed. Windows decodes uploads with Media Foundation; Linux needs FFmpeg
+  (`ffmpeg` and `ffprobe` on `PATH`).
 - A GPU with a reported memory budget. Kernels use s&box graphics APIs on AMD
   and NVIDIA; native NVIDIA acceptance remains to be performed.
 - Both FlowHMR releases and all perception/rig weights installed through
@@ -26,9 +27,8 @@ signed account requests to this loopback listener. See the [provider guide],
   at 5,000 frames at 30 fps and a 16 GiB decoded cache, independently of upload
   size. Decoder dimensions are capped at 8K with checked strides and pixel area.
 
-Linux preview, saved-motion retarget/export and hosted clients remain supported.
-This host's uploaded-video path currently requires Windows Media Foundation.
-A Linux test using predecoded frames does not verify native H.264 decoding.
+On Linux the FFmpeg decode of the five-second validation clip is byte-identical
+to the predecoded frames the GPU checks use.
 
 ## Configure and start
 

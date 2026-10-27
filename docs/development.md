@@ -275,7 +275,8 @@ Hosted capture is connected through the same `IBodyCapture` entry point.
 The client streams video, polls owned jobs and validates the downloaded
 motion before import. The opt-in `EditorHost` runs the authenticated API,
 queue and local GPU capture inside s&box; see [the operator guide](editor-host.md).
-It requires Windows decoding and manually installed, verified model files.
+It decodes with Media Foundation on Windows or FFmpeg on Linux and needs
+manually installed, verified model files.
 The separate `services/humanoid-mocap-host` starter links the same queue and
 transport source for custom providers and engine-independent tests; its
 default processor explicitly reports unavailable. See `../DOCUMENT.MD` for

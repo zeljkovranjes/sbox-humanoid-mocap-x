@@ -8,7 +8,7 @@ namespace HumanoidMocapX.EditorTools.Video;
 /// <summary>Direct C# access to Windows Media Foundation. Sequential decoded samples carry
 /// their actual presentation timestamps. No subprocess, Python, or frame-seeking approximation.
 /// ABI slots and GUIDs are from Windows SDK 10.0.26100 mfobjects.h / mfreadwrite.h.</summary>
-public sealed class WindowsVideoDecoder : IDisposable
+public sealed class WindowsVideoDecoder : IVideoDecoder
 {
     public const string ImplementationVersion="wmf-visible-oriented-v2";
     const int VideoStream=unchecked((int)0xfffffffc);

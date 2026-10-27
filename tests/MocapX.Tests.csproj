@@ -12,6 +12,8 @@
     <Compile Include="../Editor/FlowCapture.cs" Link="FlowCapture.cs" />
     <Compile Include="../Editor/HumanoidMocap/Video/DecodedVideoFrame.cs" Link="DecodedVideoFrame.cs" />
     <Compile Include="../Editor/HumanoidMocap/Video/WindowsVideoDecoder.cs" Link="WindowsVideoDecoder.cs" />
+    <Compile Include="../Editor/HumanoidMocap/Video/IVideoDecoder.cs" Link="IVideoDecoder.cs" />
+    <Compile Include="../Editor/HumanoidMocap/Video/FfmpegVideoDecoder.cs" Link="FfmpegVideoDecoder.cs" />
     <Compile Include="../Editor/HumanoidMocap/Video/VideoFrameLayout.cs" Link="VideoFrameLayout.cs" />
     <Compile Include="../Editor/Hosting/*.cs" Link="%(Filename)%(Extension)" />
     <Compile Include="../Editor/FlowCheckpoint.cs" Link="FlowCheckpoint.cs" />
