@@ -19,13 +19,12 @@ dotnet build dev/GpuChecks.csproj -c Release -m:1
 dotnet run --project tests/MocapX.Tests.csproj -c Release
 dotnet build dev/Whitelist.csproj -c Release -m:1
 dotnet dev/bin/Whitelist/Release/net10.0/Whitelist.dll \
-  dev/bin/SharedCore/Release/net10.0/package.notpointless.chomnr_humanoid_mocap.dll \
   ../../shaders/compute/tensor-inference/dev/bin/Release/net10.0/package.notpointless.chomnr_tensor_inference.dll \
   dev/bin/Core/Release/net10.0/package.notpointless.chomnr_humanoid_mocap_x.dll
 ```
 
 `Whitelist` calls the installed engine's `AccessControl.VerifyAssembly` on
-all three runtime assemblies, in dependency order. It does not change the engine's
+both runtime assemblies, in dependency order. It does not change the engine's
 rules. Editor code has separate compiler permissions in s&box; network and
 disk access live in `Editor/`. The runtime `FlowMotion` DTO validates its own
 format without shared-library references; `Editor/FlowMotionAdapter.cs`
@@ -178,8 +177,7 @@ allocation-free repeated frame copies and playback decisions. Disk-cache
 checks cover exact source bytes, corrupted-cache replacement, cancellation
 before copying, empty/missing input and removal of partial files.
 
-CI is configured for these engine-free tests on Windows and Linux; it also
-needs the corresponding shared Humanoid Mocap changes to be published.
+CI is configured for these engine-free tests on Windows and Linux.
 Editor compilation and whitelist verification require an installed engine
 and run locally.
 

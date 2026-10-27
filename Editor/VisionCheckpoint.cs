@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using HumanoidMocap.EditorTools.Inference;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.MotionBricks;
 using HumanoidMocapX.Inference;
 
 namespace HumanoidMocapX.EditorTools;

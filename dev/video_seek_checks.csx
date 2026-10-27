@@ -1,6 +1,6 @@
 // Diagnostic only: changed callbacks do not establish frame accuracy. Compare saved pixels against source frames.
 var fs = Editor.FileSystem.ProjectTemporary;
-var path = await HumanoidMocap.EditorTools.VideoFiles.CacheVideoAsync((await System.IO.File.ReadAllTextAsync(System.IO.Path.Combine(exchangeDirectory, "seek-fixture-path.txt"), cancellationToken)).Trim(), fs, cancellationToken);
+var path = await HumanoidMocapX.EditorTools.VideoFiles.CacheVideoAsync((await System.IO.File.ReadAllTextAsync(System.IO.Path.Combine(exchangeDirectory, "seek-fixture-path.txt"), cancellationToken)).Trim(), fs, cancellationToken);
 await GameTask.MainThread();
 var player = new VideoPlayer { Repeat = false, Muted = true };
 var texture = player.Texture;

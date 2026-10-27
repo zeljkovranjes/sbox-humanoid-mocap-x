@@ -1,7 +1,7 @@
 // C# adaptation of FlowHMR's narrowband_v2m attention. See THIRD_PARTY_NOTICES.md.
 using System;
 using System.Threading;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.MotionBricks;
 
 namespace HumanoidMocapX.Inference;
 

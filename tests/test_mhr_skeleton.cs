@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
-using HumanoidMocap.EditorTools.Inference;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.MotionBricks;
 using HumanoidMocapX.EditorTools;
 using HumanoidMocapX.Inference;
 

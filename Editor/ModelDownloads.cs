@@ -4,7 +4,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Editor;
-using HumanoidMocap.EditorTools;
+using HumanoidMocapX.EditorTools;
 using Sandbox;
 
 namespace HumanoidMocapX.EditorTools;

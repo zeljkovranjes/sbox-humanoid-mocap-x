@@ -1,9 +1,9 @@
 using System.Numerics;
 using System.IO.Compression;
 using System.Text;
-using HumanoidMocap.Core.Maths;
-using HumanoidMocap.Core.Motion;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.Core.Maths;
+using HumanoidMocapX.Core.Motion;
+using HumanoidMocapX.EditorTools.MotionBricks;
 using HumanoidMocapX;
 using HumanoidMocapX.EditorTools;
 using HumanoidMocapX.Inference;

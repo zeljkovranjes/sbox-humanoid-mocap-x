@@ -35,11 +35,6 @@ jobs:
         with:
           path: humanoid-mocap-x
           persist-credentials: false
-      - uses: actions/checkout@v7
-        with:
-          repository: zeljkovranjes/sbox-humanoid-mocap
-          path: humanoid-mocap
-          persist-credentials: false
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: humanoid-mocap-x/global.json

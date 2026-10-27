@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using HumanoidMocap.Core.Motion;
+using HumanoidMocapX.Core.Motion;
 
 namespace HumanoidMocapX.EditorTools;
 

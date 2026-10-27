@@ -3,8 +3,8 @@ using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using HumanoidMocap.Core.Motion;
-using HumanoidMocap.EditorTools.Inference;
+using HumanoidMocapX.Core.Motion;
+using HumanoidMocapX.EditorTools.Inference;
 
 namespace HumanoidMocapX.EditorTools;
 

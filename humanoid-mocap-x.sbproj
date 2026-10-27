@@ -8,7 +8,6 @@
   "Resources": null,
   "PublishUsedAssetsOnly": false,
   "PackageReferences": [
-    "notpointless.chomnr_humanoid_mocap",
     "notpointless.chomnr_tensor_inference"
   ],
   "EditorReferences": null,
@@ -21,13 +20,11 @@
     "Compiler": {
       "AssemblyReferences": [
         "System.IO.Pipelines",
-        "package.notpointless.chomnr_humanoid_mocap",
-        "package.notpointless.chomnr_tensor_inference",
-        "package.notpointless.chomnr_humanoid_mocap.editor"
+        "package.notpointless.chomnr_tensor_inference"
       ],
       "ReleaseMode": "Release"
     },
-    "Summary": "Third-person FlowHMR motion capture for s&box with shared Humanoid Mocap retargeting.",
+    "Summary": "Third-person FlowHMR motion capture for s&box with Humanoid Mocap retargeting built in.",
     "Tags": [
       "animation",
       "motion-capture",

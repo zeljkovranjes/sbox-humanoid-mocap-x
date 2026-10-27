@@ -9,8 +9,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using HumanoidMocap.Core.Mapping;
-using HumanoidMocap.Core.Motion;
+using HumanoidMocapX.Core.Mapping;
+using HumanoidMocapX.Core.Motion;
 
 namespace HumanoidMocapX.EditorTools;
 

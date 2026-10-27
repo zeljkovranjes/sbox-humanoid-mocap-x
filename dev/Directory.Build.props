@@ -7,6 +7,5 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <BaseIntermediateOutputPath>obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
     <BaseOutputPath>bin/$(MSBuildProjectName)/</BaseOutputPath>
-    <MocapRoot Condition="'$(MocapRoot)' == ''">$(MSBuildThisFileDirectory)../../humanoid-mocap</MocapRoot>
   </PropertyGroup>
 </Project>

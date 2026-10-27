@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using HumanoidMocap.EditorTools.Inference;
+using HumanoidMocapX.EditorTools.Inference;
 using HumanoidMocapX.Inference;
 
 namespace HumanoidMocapX.EditorTools;

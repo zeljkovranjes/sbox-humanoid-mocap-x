@@ -1,12 +1,12 @@
 using NumericVector3 = System.Numerics.Vector3;
 using System.Text;
-using HumanoidMocap.Core;
-using HumanoidMocap.Core.Cleanup;
-using HumanoidMocap.Core.Formats.Fbx;
-using HumanoidMocap.Core.Mapping;
-using HumanoidMocap.Core.Maths;
-using HumanoidMocap.Core.Motion;
-using HumanoidMocap.Core.Target;
+using HumanoidMocapX.Core;
+using HumanoidMocapX.Core.Cleanup;
+using HumanoidMocapX.Core.Formats.Fbx;
+using HumanoidMocapX.Core.Mapping;
+using HumanoidMocapX.Core.Maths;
+using HumanoidMocapX.Core.Motion;
+using HumanoidMocapX.Core.Target;
 using HumanoidMocapX;
 
 static class MotionTests
@@ -113,8 +113,8 @@ static class MotionTests
         var ankle = rig.BoneForRole(BoneRole.FootL)!.Value;
         float Travel(List<XForm[]> poses)
         {
-            var first = new HumanoidMocap.Core.Skeleton.Pose(poses[0]).ToWorld(rig.Skeleton);
-            var last = new HumanoidMocap.Core.Skeleton.Pose(poses[^1]).ToWorld(rig.Skeleton);
+            var first = new HumanoidMocapX.Core.Skeleton.Pose(poses[0]).ToWorld(rig.Skeleton);
+            var last = new HumanoidMocapX.Core.Skeleton.Pose(poses[^1]).ToWorld(rig.Skeleton);
             return Math.Abs(last[ankle].Pos.X - first[ankle].Pos.X);
         }
         var before = Travel(frames);

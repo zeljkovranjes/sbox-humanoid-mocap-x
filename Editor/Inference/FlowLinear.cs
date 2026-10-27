@@ -2,7 +2,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.MotionBricks;
 
 namespace HumanoidMocapX.Inference;
 

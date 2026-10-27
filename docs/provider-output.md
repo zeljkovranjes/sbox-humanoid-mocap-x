@@ -54,7 +54,7 @@ The shared [MotionDocument] type is the authoritative schema. A production
 result is a complete animated body. This one-bone snippet illustrates array
 shapes only; it is not a useful capture or an acceptance-test result:
 
-[MotionDocument]: ../../humanoid-mocap/Code/HumanoidMocap/Core/Motion/MotionDocument.cs
+[MotionDocument]: ../Code/HumanoidMocap/Core/Motion/MotionDocument.cs
 
 ```json
 {

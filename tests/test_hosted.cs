@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using HumanoidMocap.Core.Motion;
+using HumanoidMocapX.Core.Motion;
 using HumanoidMocapX;
 using HumanoidMocapX.EditorTools;
 

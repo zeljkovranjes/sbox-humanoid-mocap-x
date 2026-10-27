@@ -2,7 +2,7 @@ Body contact
 ============
 
 Humanoid Mocap X uses a C# adaptation of DigitalRune's cyclic-coordinate descent
-(CCD) solver in the shared Humanoid Mocap library. The port uses the existing
+(CCD) solver in its built-in copy of Humanoid Mocap. The port uses the existing
 domain skeleton and System.Numerics, without another engine or native worker.
 
 [Upstream source]: https://github.com/DigitalRune/DigitalRune/blob/a907452c8922a3360761e0569aa33110b0201b91/Source/DigitalRune.Animation/Character/IK/CcdIKSolver.cs

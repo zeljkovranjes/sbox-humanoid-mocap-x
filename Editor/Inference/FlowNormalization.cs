@@ -1,6 +1,6 @@
 // C# adaptation of FlowHMR's RMS normalization. See THIRD_PARTY_NOTICES.md.
 using System;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.MotionBricks;
 
 namespace HumanoidMocapX.Inference;
 

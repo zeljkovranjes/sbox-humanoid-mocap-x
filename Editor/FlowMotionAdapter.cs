@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
 using System.Numerics;
-using HumanoidMocap.Core.Mapping;
-using HumanoidMocap.Core.Motion;
+using HumanoidMocapX.Core.Mapping;
+using HumanoidMocapX.Core.Motion;
 
 namespace HumanoidMocapX;
 

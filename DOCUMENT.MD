@@ -26,7 +26,6 @@ video-to-animation acceptance test yet.
 Load these local projects while the packages are unpublished:
 
 ```text
-sbox/libraries/humanoid-mocap/humanoid-mocap.sbproj
 sbox/shaders/compute/tensor-inference/tensor-inference.sbproj
 sbox/libraries/humanoid-mocap-x/humanoid-mocap-x.sbproj
 ```
@@ -98,8 +97,8 @@ Click a section heading to collapse or expand it; each section remembers
 its previous state.
 
 On Windows, after choosing **This computer**, open a video. Capture verifies installed
-model hashes without contacting a download server. It reuses Humanoid
-Mocap's Windows Media Foundation decoder, including H.264, and samples the
+model hashes without contacting a download server. It reuses the built-in Humanoid
+Mocap Windows Media Foundation decoder, including H.264, and samples the
 displayed frames at 30 fps from their presentation timestamps. Missing or
 corrupt models produce an error naming the file and its download control.
 

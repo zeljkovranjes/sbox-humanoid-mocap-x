@@ -1,6 +1,6 @@
 using System.IO.Compression;
 using System.Text;
-using HumanoidMocap.EditorTools.MotionBricks;
+using HumanoidMocapX.EditorTools.MotionBricks;
 
 /// <summary>Writes protocol-2 PyTorch ZIP fixtures without a Python runtime.</summary>
 static class CheckpointFixture

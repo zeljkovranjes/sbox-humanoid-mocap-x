@@ -2,6 +2,6 @@
   <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup>
     <Compile Include="motion_checks.cs" />
-    <ProjectReference Include="SharedCore.csproj" />
+    <ProjectReference Include="Core.csproj" />
   </ItemGroup>
 </Project>

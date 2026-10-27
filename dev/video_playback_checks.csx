@@ -1,7 +1,7 @@
 // Diagnostic only: compare every callback's pixels with the known 150-frame fixture.
 var fs = Editor.FileSystem.ProjectTemporary;
 var input = (await System.IO.File.ReadAllTextAsync(System.IO.Path.Combine(exchangeDirectory, "seek-fixture-path.txt"), cancellationToken)).Trim();
-var path = await HumanoidMocap.EditorTools.VideoFiles.CacheVideoAsync(input, fs, cancellationToken);
+var path = await HumanoidMocapX.EditorTools.VideoFiles.CacheVideoAsync(input, fs, cancellationToken);
 const int bytesPerFrame = 256 * 128 * 4, maximumCallbacks = 600;
 var pixels = new byte[bytesPerFrame * maximumCallbacks]; var times = new float[maximumCallbacks];
 var count = 0; var loaded = false; var finished = false; string failure = null;
