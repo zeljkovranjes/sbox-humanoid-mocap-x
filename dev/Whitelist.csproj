@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="whitelist.cs" />
+    <Reference Include="$(FACEPUNCH_ENGINE)/bin/managed/*.dll" />
+  </ItemGroup>
+</Project>

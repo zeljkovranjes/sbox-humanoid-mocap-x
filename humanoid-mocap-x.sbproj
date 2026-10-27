@@ -1,0 +1,39 @@
+{
+  "Title": "Humanoid Mocap X",
+  "Type": "library",
+  "Org": "notpointless",
+  "Ident": "chomnr_humanoid_mocap_x",
+  "Schema": 1,
+  "IncludeSourceFiles": false,
+  "Resources": null,
+  "PublishUsedAssetsOnly": false,
+  "PackageReferences": [
+    "notpointless.chomnr_humanoid_mocap",
+    "notpointless.chomnr_tensor_inference"
+  ],
+  "EditorReferences": null,
+  "Mounts": null,
+  "IsStandaloneOnly": false,
+  "AI": {
+    "EnableMcpCommunication": true
+  },
+  "Metadata": {
+    "Compiler": {
+      "AssemblyReferences": [
+        "System.IO.Pipelines",
+        "package.notpointless.chomnr_humanoid_mocap",
+        "package.notpointless.chomnr_tensor_inference",
+        "package.notpointless.chomnr_humanoid_mocap.editor"
+      ],
+      "ReleaseMode": "Release"
+    },
+    "Summary": "Third-person FlowHMR motion capture for s&box with shared Humanoid Mocap retargeting.",
+    "Tags": [
+      "animation",
+      "motion-capture",
+      "video",
+      "humanoid",
+      "retargeting"
+    ]
+  }
+}

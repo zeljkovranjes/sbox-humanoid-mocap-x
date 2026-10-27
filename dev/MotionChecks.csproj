@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="motion_checks.cs" />
+    <ProjectReference Include="SharedCore.csproj" />
+  </ItemGroup>
+</Project>

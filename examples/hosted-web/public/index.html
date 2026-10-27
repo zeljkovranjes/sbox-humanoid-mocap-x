@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Humanoid Mocap X · Processing host</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Humanoid Mocap X</p>
+  <h1>Video to motion</h1>
+  <p>Process third-person footage, then retarget and export in s&amp;box.</p>
+  <section aria-labelledby="account-title">
+    <h2 id="account-title">Your account</h2>
+    <div id="providers"></div>
+    <div id="account" hidden>
+      <div class="identity"><img id="avatar" width="48" height="48" alt=""><div><strong id="name"></strong><p id="account-id"></p></div></div>
+      <p id="access"></p>
+      <button id="logout" class="secondary" type="button">Sign out</button>
+    </div>
+  </section>
+  <section aria-labelledby="capture-title">
+    <h2 id="capture-title">Capture</h2>
+    <form id="capture">
+      <fieldset id="capture-fields" disabled>
+        <label for="video">Third-person video</label>
+        <input id="video" type="file" accept=".mp4,.mov,.m4v,.avi,.mkv,.webm" required>
+        <div class="row">
+          <label>Model<select id="model"><option>Latest</option><option>Base</option></select></label>
+          <label>Camera sample interval<select id="interval"><option value="10">10 frames</option><option value="1">Every frame</option><option value="30">30 frames</option></select></label>
+        </div>
+        <div class="row">
+          <label>Start (seconds)<input id="start" type="number" min="0" step="any" value="0" required></label>
+          <label>End (seconds)<input id="end" type="number" min="0" step="any" value="8" required></label>
+        </div>
+        <p>The entire file is sent to this host. The requested range controls processing. Limit: 512 MiB.</p>
+        <button type="submit">Process video</button>
+      </fieldset>
+    </form>
+    <button id="cancel" class="secondary" type="button" disabled>Cancel / remove job</button>
+    <a id="download" class="button" hidden download="capture.hmotion">Download motion</a>
+    <p id="status" role="status" aria-live="polite">Checking host…</p>
+    <p id="job-id"></p>
+  </section>
+</main>
+</body>
+</html>
