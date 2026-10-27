@@ -203,7 +203,10 @@ public sealed partial class RetargetWindow
         _targetHost.Layout.Clear(true);_mocapPreview=null;
         _loader=_targetHost.Layout.Add(new ProcessingIndicator(_targetHost){Busy=_processing is not null},1);
         _loader.SetMessage(_processing is null?"Video preview. Capture has not started.":"Preparing…");_loaderStatus=null;
-        _video=_videoHost.Layout.Add(new MocapVideoWidget(_videoHost,path,useEngineVideo:true),1);
+        // The engine plays every format on Windows but cannot decode H.264 on Linux, where MP4-family
+        // files preview through the same decoder capture uses.
+        var engineVideo=OperatingSystem.IsWindows()||Path.GetExtension(path).ToLowerInvariant() is not (".mp4" or ".mov" or ".m4v");
+        _video=_videoHost.Layout.Add(new MocapVideoWidget(_videoHost,path,useEngineVideo:engineVideo),1);
         _video.TogglePlayback=TogglePlayback;
         _video.Show();
         ResetPlayback();

@@ -48,7 +48,7 @@ sealed class MocapVideoWidget : Widget
         {
             var metadata=Mp4Metadata.Read(path);
             lock(sync)duration=metadata.Duration;
-            using var decoder=new WindowsVideoDecoder(path);
+            using var decoder=IVideoDecoder.Open(path);
             var cache=new Dictionary<long,DecodedVideoFrame>();var order=new Queue<long>();
             static long Key(double time)=>(long)Math.Round(time*10000);
             DecodedVideoFrame Read()
@@ -107,9 +107,6 @@ sealed class MocapVideoWidget : Widget
             }
         }
         catch(OperationCanceledException) { }
-        // An iPhone HEVC video on a PC without Microsoft's HEVC Video Extensions is converted before capture; the converted
-        // copy replaces this preview then.
-        catch(NotSupportedException){lock(sync)failure="Preparing a preview of this video… It is converted to a format this PC can play when it is processed.";}
         catch(Exception e){lock(sync)failure="Video preview: "+e.Message;}
         finally{stop.Dispose();}
     }

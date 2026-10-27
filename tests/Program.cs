@@ -42,6 +42,7 @@ if (args is ["--sam-checkpoint", var samPath, "--mhr-checkpoint", var samMhrPath
 if (args is ["--flow-checkpoint", var flowPath, "--smpl-model", var smplPath]) DecoderTests.Released(flowPath, smplPath);
 await PreviewTests.Run();
 await VideoFramesTests.Run();
+await FfmpegVideoTests.Run();
 await InstalledTests.Run();
 await DownloadTests.Run();
 await HostedTests.Run();
