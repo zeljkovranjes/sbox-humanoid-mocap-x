@@ -346,7 +346,7 @@ public static class CaptureDespike
     static int Angles( float[] track, bool[] changed )
     {
         var frames = track.Length; var half = Window / 2;
-        var given = (float[])track.Clone();
+        var given = new float[frames]; Array.Copy( track, given, frames );
         Array.Clear( changed ); var count = 0;
         for ( var f = half; f < frames - half; f++ )
         {
@@ -364,7 +364,7 @@ public static class CaptureDespike
     static int Positions( Vector3[] track, bool[] changed, float cmPerUnit )
     {
         var frames = track.Length; var half = Window / 2;
-        var given = (Vector3[])track.Clone();
+        var given = new Vector3[frames]; Array.Copy( track, given, frames );
         Array.Clear( changed ); var count = 0;
         for ( var f = half; f < frames - half; f++ )
         {
