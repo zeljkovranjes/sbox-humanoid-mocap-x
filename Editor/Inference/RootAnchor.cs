@@ -16,10 +16,12 @@ using Vector3 = System.Numerics.Vector3;
 internal static class RootAnchor
 {
     // A camera that turns further than this over the clip, or whose centre moves further than
-    // this share of the scene's distance, is not static. Both tripod validation clips travel
-    // 0.001–0.002; 0.05 is about 30 cm at dancing distance, the size of the drift corrected.
+    // this share of the scene's distance, is not static. Measured travel: tripods 0.001–0.002,
+    // a camera panning from one spot 0.007, a handheld camera walking a deep park path 0.023
+    // (about a metre there). Leaning low only costs the anchor on a still camera; leaning high
+    // would pull the root after a moving one.
     const double MaxCameraTurn = 2 * Math.PI / 180;
-    internal const float MaxCameraTravel = .05f;
+    internal const float MaxCameraTravel = .015f;
     // Body directions that disagree by more than this after the camera fit are left out of it.
     const float FitResidual = 30 * MathF.PI / 180;
     // Smoothing in frames: across the image and in depth.
