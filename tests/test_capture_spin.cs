@@ -15,11 +15,25 @@ static class CaptureSpinTests
         MotionTests.Check(steps.Max() - steps.Min() < 6, $"Spin rate still uneven: {steps.Min():F1}..{steps.Max():F1} degrees per frame");
         MotionTests.Near(before[30], after[30], 12);
 
+        // Where the hip line stands near vertical (a windmill) its heading means nothing; those frames are left alone, and
+        // no frame is turned further than MaxTurnDegrees.
+        var tumbling = Turning(f => f * 40 + (f % 2 == 0 ? 0 : 20)).ToDocument(); var roll = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 2);
+        for (var f = 28; f <= 31; f++) tumbling.Frames[f].Rotations[0] = Q(MotionDocument.Q(tumbling.Frames[f].Rotations[0]) * roll);
+        var captured = tumbling.Frames.Select(f => MotionDocument.Q(f.Rotations[0])).ToArray();
+        CaptureSpin.Apply(tumbling);
+        for (var f = 0; f < captured.Length; f++)
+        {
+            var turned = 2 * Math.Acos(Math.Min(1, Math.Abs(Quaternion.Dot(captured[f], MotionDocument.Q(tumbling.Frames[f].Rotations[0]))))) * 180 / Math.PI;
+            MotionTests.Check(f is < 28 or > 31 ? turned <= CaptureSpin.MaxTurnDegrees + .01 : turned < .1, $"Frame {f} turned {turned:F1} degrees");
+        }
+
         var slow = Turning(f => f * 5).ToDocument(); var original = Turning(f => f * 5).ToDocument();
         MotionTests.Equal(0, CaptureSpin.Apply(slow));
         MotionTests.Near(1, Quaternion.Dot(MotionDocument.Q(original.Frames[30].Rotations[0]), MotionDocument.Q(slow.Frames[30].Rotations[0])), 1e-7);
-        Console.WriteLine("PASS: capture spin evens out fast uneven turns, keeps their heading and leaves slow turns alone");
+        Console.WriteLine("PASS: capture spin evens out fast uneven turns, keeps their heading, caps each turn, skips frames with an upright hip line and leaves slow turns alone");
     }
+
+    static float[] Q(Quaternion q) => new[] { q.X, q.Y, q.Z, q.W };
 
     /// <summary>The motion fixture turned about the vertical by <paramref name="degrees"/> per frame index.</summary>
     static FlowMotion Turning(Func<int, float> degrees)

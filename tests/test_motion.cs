@@ -18,7 +18,8 @@ static class MotionTests
         Retarget(false);
         Retarget(true);
         FootContacts();
-        Console.WriteLine("PASS: motion conversion, input validation, Human/Citizen scale and FBX, planted feet and airborne release");
+        InvertedContacts();
+        Console.WriteLine("PASS: motion conversion, input validation, Human/Citizen scale and FBX, planted feet, airborne release and no floor contact from feet held up in a headstand");
     }
 
     static void Conversion()
@@ -132,6 +133,19 @@ static class MotionTests
         for (var f = 0; f < frames.Count; f++)
             for (var j = 0; j < frames[f].Length; j++)
                 Near(0, NumericVector3.Distance(frames[f][j].Pos, source.Clips[0].Frames[f][j].Pos));
+    }
+
+    /// <summary>Feet the contact tracks mark planted while held still above an upside-down body are not on the floor.</summary>
+    static void InvertedContacts()
+    {
+        var fixture = Fixture();
+        for (var f = 20; f < 40; f++) fixture.Poses[f][0] = MathF.PI;
+        var source = fixture.ToDocument().ToSourceScene();
+        var rig = TargetRig.FromSkeleton(source.Skeleton, source.AuthoredMapping);
+        var frames = source.Clips[0].Frames.Select(f => (XForm[])f.Clone()).ToList();
+        var mask = CaptureContactRoot.ContactMask(frames, source, source.AuthoredMapping!, rig, TargetUpAxis.YUpCm)!;
+        Check(Enumerable.Range(0, 20).Concat(Enumerable.Range(40, 20)).All(f => mask[f]), "Standing feet lost their contact");
+        Check(Enumerable.Range(20, 20).All(f => !mask[f]), "Feet held up in a headstand counted as on the floor");
     }
 
     internal static FlowMotion Fixture()

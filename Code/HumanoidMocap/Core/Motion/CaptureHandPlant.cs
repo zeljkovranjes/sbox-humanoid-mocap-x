@@ -45,7 +45,7 @@ public static class CaptureHandPlant
     /// <returns>The number of hand samples held.</returns>
     /// <param name="observed">Frames in which the video shows each hand on the floor under a raised body, by hand role;
     /// such a hand is planted even where the capture lifted it.</param>
-    public static int Apply( List<XForm[]> frames, TargetRig target, TargetUpAxis axis, float fps, IReadOnlyDictionary<BoneRole, bool[]>? observed = null )
+    public static int Apply( List<XForm[]> frames, TargetRig target, TargetUpAxis axis, float fps, IReadOnlyDictionary<BoneRole, bool[]> observed = null )
     {
         if ( frames.Count < 3 || fps <= 0 ) return 0;
         var rig = target.Skeleton; var up = axis == TargetUpAxis.YUpCm ? Vector3.UnitY : Vector3.UnitZ;
@@ -88,7 +88,17 @@ public static class CaptureHandPlant
             for ( var f = 0; f < frames.Count; )
             {
                 if ( !Resting( f, NearFloorCm ) ) { f++; continue; }
-                var e = f; while ( e + 1 < frames.Count && Resting( e + 1, LiftCm ) ) e++;
+                var e = f;
+                while ( true )
+                {
+                    while ( e + 1 < frames.Count && Resting( e + 1, LiftCm ) ) e++;
+                    // The lowest hand under a raised body still carries it while the capture lifts it for a moment: through the
+                    // breakin clip's one-handed spin it lifted the support hand up to 22 cm for three to five frames, and each
+                    // touch after that landed somewhere new. Up to BlendSeconds of that stays one hold.
+                    var g = e + 1; while ( g < frames.Count && g - e <= blend && supported[g] && Lowest( g ) && !Resting( g, NearFloorCm ) ) g++;
+                    if ( g == e + 1 || g >= frames.Count || g - e > blend || !Resting( g, NearFloorCm ) ) break;
+                    e = g;
+                }
                 if ( e - f + 1 >= minimum )
                 {
                     // Held where it landed: a hand that touches down stays there. The capture's slide builds up while it rests
@@ -109,12 +119,13 @@ public static class CaptureHandPlant
                             var goal = anchor + up * (Vector3.Dot( p[i], up ) - low[i]);
                             if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (goal, w, bearing);
                         }
-                        // Everything held at the last frame, height included, is let go gradually.
+                        // Everything held at the last frame, height included, is let go gradually; a flat palm curls back
+                        // over the same frames instead of snapping.
                         var carried = anchor + up * (Vector3.Dot( p[e], up ) - low[e]) - p[e];
                         for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
                         {
                             var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (p[i] + carried, w, false);
+                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (p[i] + carried, w, bearing);
                         }
                     }
                 }
@@ -125,7 +136,9 @@ public static class CaptureHandPlant
         var seen = arms.ToDictionary( a => a.C, a => observed?.GetValueOrDefault( target.BoneForRole( BoneRole.HandL ) == a.C ? BoneRole.HandL : BoneRole.HandR ) is { } mask
             && mask.Length == frames.Count ? mask : new bool[frames.Count] );
         SecondHands( frames, rig, arms, parts, supported, seen, goals, bearings, up, cm, still, minimum, blend );
-        Balance( frames, target, bearings, goals, up );
+        Balance( frames, target, bearings, goals, up, fps );
+        var heading = arms.ToDictionary( a => a.C, a => chains[a.C] is { } chain
+            ? Headings( frames, rig, a.C, chain, target.BoneForRole( BoneRole.HandL ) == a.C, goals[a.C], up ) : null );
         var held = 0;
         for ( var f = 0; f < frames.Count; f++ )
         {
@@ -143,6 +156,11 @@ public static class CaptureHandPlant
                     // A hand carrying the body lies flat: palm onto the floor, fingers straight along it, its lowest point on the floor.
                     var down = Quaternion.Slerp( Quaternion.Identity, FromTo( PalmNormal( world, chain, a.C, target.BoneForRole( BoneRole.HandL ) == a.C ), -up ), weight );
                     rotation = Quaternion.Normalize( down * rotation );
+                    if ( heading[a.C] is { } turning && !double.IsNaN( turning[f] ) )
+                    {
+                        var turn = (float)Math.IEEERemainder( turning[f] - Heading( Vector3.Transform( frame[chain[3]].Pos, rotation ), up ), 2 * Math.PI ) * weight;
+                        rotation = Quaternion.Normalize( Quaternion.CreateFromAxisAngle( up, turn ) * rotation );
+                    }
                     Straighten( frame, chain, weight );
                     var parent0 = rig[a.C].ParentIndex;
                     frame[a.C].Rot = Quaternion.Normalize( (parent0 < 0 ? Quaternion.Identity : Quaternion.Inverse( world[parent0].Rot )) * rotation );
@@ -209,9 +227,26 @@ public static class CaptureHandPlant
                 shift[i] ??= carried * w;
             }
         }
+        // Smoothed over time: the capture's frame-to-frame jitter at the hand would otherwise shake the whole body. The window
+        // stays symmetric and inside the carried frames, shrinking toward their ends, so the body is not moved before the hand
+        // lands (a hand landing on a 3 cm-a-frame slide settled 5 cm sideways) and a steady slide is followed exactly. The
+        // arm's IK below keeps the hand itself exactly where it landed.
+        var smoothed = new Vector3[frames.Count]; var radius = (int)MathF.Ceiling( 3 * CarrySigmaFrames );
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            if ( shift[f] is null ) continue;
+            var reach = 0;
+            while ( reach < radius && f - reach - 1 >= 0 && f + reach + 1 < frames.Count && shift[f - reach - 1] is not null && shift[f + reach + 1] is not null ) reach++;
+            var sum = Vector3.Zero; var total = 0f;
+            for ( var j = f - reach; j <= f + reach; j++ )
+            {
+                var g = MathF.Exp( -.5f * (j - f) * (j - f) / (CarrySigmaFrames * CarrySigmaFrames) ); sum += shift[j]!.Value * g; total += g;
+            }
+            smoothed[f] = sum / total;
+        }
         var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
         for ( var f = 0; f < frames.Count; f++ )
-            if ( shift[f] is { } move ) foreach ( var root in roots ) frames[f][root].Pos += move;
+            if ( smoothed[f].LengthSquared() > 0 ) foreach ( var root in roots ) frames[f][root].Pos += smoothed[f];
     }
 
     /// <summary>Plants a hand that bears weight beside the one carrying the body: where the video shows it on the floor
@@ -227,6 +262,7 @@ public static class CaptureHandPlant
         var wrist = hands.ToDictionary( h => h, _ => new Vector3[frames.Count] ); var low = hands.ToDictionary( h => h, _ => new float[frames.Count] );
         // Whether the floor under each wrist lies within the arm's reach of its shoulder.
         var reachable = hands.ToDictionary( h => h, _ => new bool[frames.Count] );
+        var shoulder = hands.ToDictionary( h => h, _ => new Vector3[frames.Count] ); var reach = hands.ToDictionary( h => h, _ => new float[frames.Count] );
         for ( var f = 0; f < frames.Count; f++ )
         {
             FkUtil.ToWorld( frames[f], rig, world );
@@ -234,7 +270,8 @@ public static class CaptureHandPlant
             {
                 wrist[h][f] = world[h].Pos; low[h][f] = parts[h].Min( p => Vector3.Dot( world[p].Pos, up ) );
                 var floor = world[h].Pos - up * low[h][f];
-                reachable[h][f] = Vector3.Distance( world[a].Pos, floor ) <= 1.02f * (Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[h].Pos ));
+                shoulder[h][f] = world[a].Pos; reach[h][f] = 1.02f * (Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[h].Pos ));
+                reachable[h][f] = Vector3.Distance( world[a].Pos, floor ) <= reach[h][f];
             }
         }
         foreach ( var h in hands )
@@ -250,18 +287,33 @@ public static class CaptureHandPlant
                 // reaching for it would only drag the body off the hand carrying it.
                 if ( e - f + 1 >= minimum && Enumerable.Range( f, e - f + 1 ).Count( i => reachable[h][i] ) * 2 >= e - f + 1 )
                 {
-                    var anchor = Flat( p[f], up ); var settle = Math.Max( 1, Math.Min( 3, (e - f) / 3 ) );
-                    for ( var i = f; i <= e; i++ )
+                    // A hand that never leaves the floor is one touch: it keeps the place of a hold ending just before, and a hold
+                    // starting just after carries on at this one's. The breakin clip's right hand, held through the closing freeze,
+                    // jumped 66 cm to where the first pass had put it as the dancer pushed up.
+                    var before = bearings.FindIndex( s => s.Hand == h && s.Last == f - 1 );
+                    var anchor = before >= 0 ? bearings[before].Anchor : Flat( p[f], up ); var settle = Math.Max( 1, Math.Min( 3, (e - f) / 3 ) );
+                    var after = bearings.FindIndex( s => s.Hand == h && s.First == e + 1 );
+                    var last = after >= 0 ? bearings[after].Last : e;
+                    if ( after >= 0 ) bearings.RemoveAt( after );
+                    for ( var i = f; i <= last; i++ )
                     {
-                        var w = Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
-                        if ( w > goals[h][i].Weight || !goals[h][i].Bearing ) goals[h][i] = (anchor + up * (Vector3.Dot( p[i], up ) - low[h][i]), w, true);
+                        var goal = anchor + up * (Vector3.Dot( p[i], up ) - low[h][i]);
+                        // Carried on only while the place stays within the arm's reach; as the body rises off it the hand lifts.
+                        if ( i > e && Vector3.Distance( shoulder[h][i], goal ) > reach[h][i] )
+                        {
+                            for ( var j = i; j <= Math.Min( frames.Count - 1, last + blend ); j++ ) goals[h][j] = default;
+                            last = i - 1; break;
+                        }
+                        var w = before >= 0 ? 1 : Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
+                        goals[h][i] = (goal, w, true);
                     }
+                    e = last;
                     bearings.Add( (h, f, e, anchor) );
                     var carried = anchor + up * (Vector3.Dot( p[e], up ) - low[h][e]) - p[e];
                     for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
                     {
                         var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                        if ( w > goals[h][i].Weight ) goals[h][i] = (p[i] + carried, w, false);
+                        if ( w >= goals[h][i].Weight ) goals[h][i] = (p[i] + carried, w, true);
                     }
                 }
                 f = e + 1;
@@ -278,35 +330,57 @@ public static class CaptureHandPlant
         (BoneRole.UpperLegL, BoneRole.LowerLegL, .14f), (BoneRole.UpperLegR, BoneRole.LowerLegR, .14f),
         (BoneRole.LowerLegL, BoneRole.FootL, .06f), (BoneRole.LowerLegR, BoneRole.FootR, .06f)
     };
-    /// <summary>A body on one hand is tilted at most this far to bring its weight over the hand.</summary>
-    public const float MaximumBalanceDegrees = 30;
+    /// <summary>A body on one hand is tilted at most this far to bring its weight over the hand, only where it stays on
+    /// that hand at least BalanceMinimumSeconds (a windmill's brief touches are not held long enough to tip the body
+    /// over), and the tilt is smoothed over BalanceSigmaFrames so it eases in and out.</summary>
+    public const float MaximumBalanceDegrees = 30, BalanceMinimumSeconds = .4f, BalanceSigmaFrames = 4;
+    /// <summary>The body's move over a carrying hand is smoothed over this many frames.</summary>
+    public const float CarrySigmaFrames = 3;
+    /// <summary>Frames over which a flat hand's heading on the floor is smoothed.</summary>
+    public const float HeadingSigmaFrames = 3;
 
     /// <summary>Tilts a body that rests on a single hand about that wrist until its centre of mass is over it: on one
     /// hand it cannot be anywhere else without falling. The breakin clip's one-handed spin leaned 14° off the hand
     /// in the capture where SAM saw 5°, which swung the free hand on a circle a quarter wider. Two hands or a hand and
     /// the head down share the weight, and the body is left as captured.</summary>
     static void Balance( List<XForm[]> frames, TargetRig target, List<(int Hand, int First, int Last, Vector3 Anchor)> bearings,
-        Dictionary<int, (Vector3 Position, float Weight, bool Bearing)[]> goals, Vector3 up )
+        Dictionary<int, (Vector3 Position, float Weight, bool Bearing)[]> goals, Vector3 up, float fps )
     {
         var rig = target.Skeleton; var segments = Segments.Select( s => (A: target.BoneForRole( s.From ), B: target.BoneForRole( s.To ), s.Mass) ).ToArray();
         if ( bearings.Count == 0 || segments.Any( s => s.A is null || s.B is null ) ) return;
         var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
-        var world = new XForm[rig.Count];
+        var world = new XForm[rig.Count]; var minimum = (int)MathF.Ceiling( BalanceMinimumSeconds * fps );
+        // The tilt each frame needs, as an axis times an angle, and the hand it turns about; zero where none is needed.
+        var needed = new Vector3[frames.Count]; var pivotHand = new int[frames.Count]; Array.Fill( pivotHand, -1 );
         for ( var f = 0; f < frames.Count; f++ )
         {
             var on = bearings.Where( s => s.First <= f && f <= s.Last ).ToArray();
-            if ( on.Length != 1 ) continue;
-            var hand = on[0].Hand; var weight = goals[hand][f].Weight; if ( weight <= 0 ) continue;
+            if ( on.Length != 1 || on[0].Last - on[0].First + 1 < minimum ) continue;
+            var hand = on[0].Hand; pivotHand[f] = hand;
             FkUtil.ToWorld( frames[f], rig, world );
             var centre = Vector3.Zero; var mass = 0f;
             foreach ( var (a, b, m) in segments ) { centre += (world[a!.Value].Pos + world[b!.Value].Pos) * .5f * m; mass += m; }
             var lever = centre / mass - world[hand].Pos;
             if ( Vector3.Dot( lever, up ) <= 0 ) continue;
-            var tilt = FromTo( Vector3.Normalize( lever ), up );
-            var angle = 2 * MathF.Acos( Math.Clamp( MathF.Abs( tilt.W ), 0, 1 ) );
-            var limit = MaximumBalanceDegrees * MathF.PI / 180;
-            if ( angle > limit ) tilt = Quaternion.Slerp( Quaternion.Identity, tilt, limit / angle );
-            tilt = Quaternion.Normalize( Quaternion.Slerp( Quaternion.Identity, tilt, weight ) );
+            var axis = Vector3.Cross( Vector3.Normalize( lever ), up );
+            if ( axis.LengthSquared() < 1e-12f ) continue;
+            var angle = MathF.Min( MathF.Acos( Math.Clamp( Vector3.Dot( Vector3.Normalize( lever ), up ), -1, 1 ) ), MaximumBalanceDegrees * MathF.PI / 180 );
+            needed[f] = Vector3.Normalize( axis ) * angle * goals[hand][f].Weight;
+        }
+        // Smoothed over time, zeros included, so the tilt eases in and out instead of switching with the hand.
+        var radius = (int)MathF.Ceiling( 3 * BalanceSigmaFrames );
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            var sum = Vector3.Zero; var total = 0f; var hand = -1; var nearest = int.MaxValue;
+            for ( var j = Math.Max( 0, f - radius ); j <= Math.Min( frames.Count - 1, f + radius ); j++ )
+            {
+                var g = MathF.Exp( -.5f * (j - f) * (j - f) / (BalanceSigmaFrames * BalanceSigmaFrames) ); sum += needed[j] * g; total += g;
+                if ( pivotHand[j] >= 0 && Math.Abs( j - f ) < nearest ) { nearest = Math.Abs( j - f ); hand = pivotHand[j]; }
+            }
+            var turn = sum / total;
+            if ( hand < 0 || turn.LengthSquared() < 1e-10f ) continue;
+            var tilt = Quaternion.CreateFromAxisAngle( Vector3.Normalize( turn ), turn.Length() );
+            FkUtil.ToWorld( frames[f], rig, world );
             var pivot = world[hand].Pos;
             foreach ( var root in roots )
             {
@@ -343,6 +417,40 @@ public static class CaptureHandPlant
                 frame[bone].Rot = Quaternion.Normalize( Quaternion.Slerp( rotation, straight, weight ) );
             }
     }
+
+    /// <summary>Per frame of each hold, the heading a flat hand has on the floor (toward its middle knuckle), smoothed over
+    /// <see cref="HeadingSigmaFrames"/> within the hold; NaN outside holds. Through the breakin clip's spin on one hand the
+    /// support hand turned with the body, 30° a frame, which smoothing keeps; in the closing freeze the capture wobbled it
+    /// 33° over three frames and back, which it removes.</summary>
+    static double[] Headings( List<XForm[]> frames, HumanoidMocapX.Core.Skeleton.Skeleton rig, int hand, int[] chain, bool left,
+        (Vector3 Position, float Weight, bool Bearing)[] goals, Vector3 up )
+    {
+        var raw = new double[frames.Count]; Array.Fill( raw, double.NaN ); var world = new XForm[rig.Count];
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            if ( !goals[f].Bearing || goals[f].Weight <= 0 ) continue;
+            FkUtil.ToWorld( frames[f], rig, world );
+            var flat = Quaternion.Normalize( FromTo( PalmNormal( world, chain, hand, left ), -up ) * world[hand].Rot );
+            raw[f] = Heading( Vector3.Transform( frames[f][chain[3]].Pos, flat ), up );
+            if ( f > 0 && !double.IsNaN( raw[f - 1] ) ) raw[f] = raw[f - 1] + Math.IEEERemainder( raw[f] - raw[f - 1], 2 * Math.PI );
+        }
+        var smoothed = new double[frames.Count]; var radius = (int)Math.Ceiling( 3 * HeadingSigmaFrames );
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            smoothed[f] = double.NaN;
+            if ( double.IsNaN( raw[f] ) ) continue;
+            double sum = 0, total = 0;
+            // Only within this hold: the unwrapped heading is continuous there.
+            for ( var j = f; j >= Math.Max( 0, f - radius ) && !double.IsNaN( raw[j] ); j-- ) Add( j );
+            for ( var j = f + 1; j <= Math.Min( frames.Count - 1, f + radius ) && !double.IsNaN( raw[j] ); j++ ) Add( j );
+            smoothed[f] = sum / total;
+            void Add( int j ) { var g = Math.Exp( -.5 * (j - f) * (j - f) / (HeadingSigmaFrames * HeadingSigmaFrames) ); sum += g * raw[j]; total += g; }
+        }
+        return smoothed;
+    }
+
+    /// <summary>The angle of <paramref name="v"/> on the floor, increasing with turns about <paramref name="up"/>.</summary>
+    static float Heading( Vector3 v, Vector3 up ) => MathF.Atan2( Vector3.Dot( v, Vector3.Cross( up, Vector3.UnitX ) ), Vector3.Dot( v, Vector3.UnitX ) );
 
     static Quaternion FromTo( Vector3 from, Vector3 to )
     {

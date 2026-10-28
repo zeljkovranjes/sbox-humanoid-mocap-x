@@ -880,7 +880,7 @@ public static class Retargeter
             // Keep the whole clip on the floor, including camera-relative captures and dance with few plants.
             if(scene.CaptureSpace is not null)
             {
-                var contactMask=Motion.CaptureContactRoot.ContactMask(frames.Count,scene,map);
+                var contactMask=Motion.CaptureContactRoot.ContactMask(frames,scene,map,target.Rig,target.UpAxis);
                 var grounded=Motion.CaptureGround.Apply(frames,target.Rig,target.UpAxis,solved.Fps,contactMask);
                 if(grounded>0)AddNote(report,FormattableString.Invariant($"Floor followed through the clip: up to {grounded:F1} cm of drift toward or away from the floor removed."));
                 var hovering=Motion.CaptureHover.Apply(frames,target.Rig,target.UpAxis,solved.Fps,contactMask);
