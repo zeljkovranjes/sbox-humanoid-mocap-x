@@ -799,9 +799,23 @@ eyes, in eye spans:
 | Five-second clip, 150 frames | 12.4 → 6.3 px | 0.360 → 0.296 | 0.368 → 0.290 | 0.105 → 0.064 |
 
 MediaPipe found hands in 134 of 544 breakin hand-frames and 234 of 300 on the
-five-second clip, and a face in 124 of its 150 frames. It found no face under
-the breakin helmet. The remaining nose-height difference matches the one
-between SAM's own 2D face and MediaPipe's (0.052).
+five-second clip, and a face in 124 of its 150 frames. Its face mesh finds no
+face under the breakin helmet, but its pose model places nose and eyes there in
+228 frames. Measured against the pose model, nose height went from +0.160 to
++0.104 on the breakin clip and from +0.264 to +0.098 on the five-second clip.
+
+The two MediaPipe models place nose and eyes differently, about 0.16 eye spans
+apart, so neither gives an absolute zero. Both agree on how far the head
+moved (0.163 and 0.166 on the five-second clip). After the change, the capture
+sits within 0.03 of where SAM's own 2D face sits against each of them (−0.052,
++0.117 and +0.076). Against these landmarks, that is where a capture matches the
+video as closely as the detectors match each other.
+
+Hands use the same yardstick. With the best 2D scale and in-plane turn removed,
+SAM's hand points lie 0.14–0.17 hand sizes from MediaPipe's, and the capture's
+0.17–0.20. Hand size does not reach the target rig, which keeps its own
+proportions. Scale-normalized, the trusted hand frames improved from 0.295 to
+0.222 (breakin) and from 0.225 to 0.221.
 
 The head was first measured from the ears. The SMPL template's ear vertices put
 the head's forward axis 3.15° from the ear-to-nose line, but SAM's ear keypoints
@@ -824,12 +838,33 @@ in the image. MediaPipe confirms the rule. Fully trusted hand passes lie 0.39
 about 35 pixels across, 58–63% of hand frames are used; on the five-second
 clip, 91%. Body-pass hand keypoints match MediaPipe more closely in 2D, but
 taking wrists and fingers from them was worse in the projected capture (0.366
-and 0.317 hand shape), so the hand passes stay the source.
+and 0.317 hand shape), so the hand passes stay the source. On the
+low-agreement frames themselves (scale-normalized), FlowHMR's hand scores 0.828
+and 0.464, the partial blend 0.674 and 0.411, and the body pass 0.671 and
+0.436. No available source does better there.
 
 The breakin fixture's boxes, camera rotations, intrinsics, features and
 FlowHMR motion stay byte-identical to the run before this change; only
-`capture.hmotion` and both FBX exports differ. VGGT's camera centres move 0.002
-(breakin) and 0.001 (five-second clip) of the scene's distance; anchoring stops
-above 0.05. No moving-camera clip was available to exercise that limit outside
-the unit tests. A single view cannot show how far fingers curl toward the
-camera, so curled idle hands can still read straighter than in the video.
+`capture.hmotion` and both FBX exports differ.
+
+Root anchoring needs a camera that neither turns more than 2° nor travels.
+VGGT's camera centres were measured on these clips and on two Wikimedia Commons
+clips (CC BY-SA, used for testing only):
+
+| Clip | Camera | Travel | Largest turn |
+| --- | --- | ---: | ---: |
+| Five-second clip | tripod | 0.001 | 0.05° |
+| Breakin | tripod | 0.002 | 0.25° |
+| [Personas patinando en PARCUR] | panning from one spot | 0.007 | 10.4° |
+| [Spring shoes jogger Riverside Park] | handheld, walking | 0.023 | 10.3° |
+
+Travel is a share of the scene's mean distance. The walking camera covers about
+a metre of a deep park path but scores only 0.023, so anchoring stops above
+0.015. A real capture of the first 4 s of the jogger clip leaves the root on
+FlowHMR's path, as both limits require. A single view cannot show how far
+fingers curl toward the camera, so curled idle hands can still read straighter
+than in the video.
+
+[Personas patinando en PARCUR]: https://commons.wikimedia.org/wiki/File:Personas_patinando_en_PARCUR.webm
+[Spring shoes jogger Riverside Park]: https://commons.wikimedia.org/wiki/File:Spring_shoes_jogger_Riverside_Park_jeh.ogv
+
