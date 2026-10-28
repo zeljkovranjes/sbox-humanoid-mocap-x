@@ -22,6 +22,8 @@ internal sealed record ObservedDetail(float[] Observations, float[] CameraRotati
             document.Diagnostics.Add(FormattableString.Invariant($"Hands on the floor under a raised body, as SAM 3D Body sees them: {planted} hand frames marked for planting."));
         if (CaptureSpin.Apply(document) is var spun && spun > 0)
             document.Diagnostics.Add(FormattableString.Invariant($"Fast spins turn evenly: the body's heading was smoothed in {spun} frames."));
+        if (CaptureDespike.Apply(document) is var despiked && despiked > 0)
+            document.Diagnostics.Add(FormattableString.Invariant($"Snaps removed: {despiked} joint samples that left the smooth path through their neighbours were pulled back onto it."));
         document.Diagnostics.Add(FormattableString.Invariant($"Wrists and fingers follow SAM 3D Body's hand close-ups in {hands * 100:0}% and {fingers * 100:0}% of hand frames; head pitch follows its face keypoints, by up to {head:0}°."));
         document.Diagnostics.Add(root is { } shift
             ? FormattableString.Invariant($"The camera is static, so the root follows the person's position in the video, up to {shift:0.00} m from FlowHMR's path.")
