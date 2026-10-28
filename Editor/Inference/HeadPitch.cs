@@ -41,7 +41,7 @@ internal static class HeadPitch
         {
             var k = observations.Slice(f * SamObservations.Elements, SamKeypoints.Count * 3);
             var observed = MotionPose.Angle(Mid(k, LeftShoulder, RightShoulder) - Mid(k, LeftHip, RightHip),
-                Point(k, Nose) - Mid(k, LeftEar, RightEar), Point(k, RightShoulder) - Point(k, LeftShoulder), out var faceSupport);
+                SamObservations.Point(k, Nose) - Mid(k, LeftEar, RightEar), SamObservations.Point(k, RightShoulder) - SamObservations.Point(k, LeftShoulder), out var faceSupport);
             MotionPose.World(document, document.Frames[f], world, position);
             lateral[f] = position[armR] - position[armL];
             var captured = MotionPose.Angle((position[armL] + position[armR] - position[legL] - position[legR]) / 2,
@@ -75,8 +75,7 @@ internal static class HeadPitch
         frame.Rotations[bone] = new[] { rotation.X, rotation.Y, rotation.Z, rotation.W };
     }
 
-    static Vector3 Point(ReadOnlySpan<float> points, int i) => new(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]);
-    static Vector3 Mid(ReadOnlySpan<float> points, int a, int b) => (Point(points, a) + Point(points, b)) / 2;
+    static Vector3 Mid(ReadOnlySpan<float> points, int a, int b) => (SamObservations.Point(points, a) + SamObservations.Point(points, b)) / 2;
     static float Wrap(float angle) => MathF.IEEERemainder(angle, 2 * MathF.PI);
     static double Ramp(double value, double zero, double one) => Math.Clamp((value - zero) / (one - zero), 0, 1);
 }

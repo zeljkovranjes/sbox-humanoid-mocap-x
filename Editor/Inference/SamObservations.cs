@@ -1,4 +1,8 @@
+using System;
+
 namespace HumanoidMocapX.Inference;
+
+using Vector3 = System.Numerics.Vector3;
 
 /// <summary>Per-frame SAM 3D Body results kept beside FlowHMR's features. Keypoints follow
 /// MHR70: 0–4 face, 5–20 body, 21–41 right hand and 42–62 left hand (tip, two middle joints and
@@ -19,4 +23,7 @@ internal static class SamObservations
     /// <summary>Original-image XY keypoints of the body, left hand and right hand passes.</summary>
     internal const int ImageKeypoints = RightHand + HandPoints * 3;
     internal const int Elements = ImageKeypoints + 3 * SamKeypoints.Count * 2;
+
+    /// <summary>The <paramref name="index"/>th 3D point of a run of XYZ triples.</summary>
+    internal static Vector3 Point(ReadOnlySpan<float> points, int index) => new(points[index * 3], points[index * 3 + 1], points[index * 3 + 2]);
 }
