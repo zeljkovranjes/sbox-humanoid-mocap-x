@@ -777,3 +777,33 @@ that same bound to capture. The host tests cover maximum configuration values,
 rejected over-limit requests and a short clip whose six-lane feature reserve
 holds the queue when four lanes would fit. The operator can explicitly retain
 four lanes with `MOCAP_LANES=4`; see [the host guide](editor-host.md).
+
+## Observed detail
+
+SAM 3D Body's per-frame keypoints now refine FlowHMR's motion. Fingers follow
+the hand passes, head pitch follows the face keypoints, and, when the camera
+turns less than 2° over the clip, the root follows SAM's pelvis position.
+Both validation clips ran on an RTX 2080 Ti with the Linux worker. The
+measurements compare each capture before and after refinement against SAM's
+own observations:
+
+| Clip | Root offset at the end | Largest lateral offset | Median head-pitch disagreement | Finger curl range |
+| --- | ---: | ---: | ---: | ---: |
+| Breakin, 272 frames | 0.30 → 0.02 m | 0.36 → 0.14 m | 11.6° → 4.1° | 1.6° → 18.9° |
+| Five-second clip, 150 frames | 0.04 → 0.03 m | 0.04 → 0.02 m | 20.3° → 0.8° | 1.9° → 19.5° |
+
+Offsets are horizontal, in camera axes, relative to the first ten frames.
+Finger curl is the mean proximal-joint bend of the eight non-thumb fingers; the
+range runs from its 5th to 95th percentile over the clip. FlowHMR held nearly one
+hand pose throughout. The head-pitch constant (3.15° between the head's forward
+axis and the ear-to-nose line) comes from the SMPL template's COCO face vertices.
+
+The breakin fixture's boxes, camera rotations, intrinsics, features and
+FlowHMR motion stay byte-identical to the run before this change; only
+`capture.hmotion` and both FBX exports differ. Hand-pass frames are used in
+proportion to how well each hand pass agrees with the body pass in the image:
+63% of hand frames on the breakin clip, whose gloved hands are about 30 pixels
+across, and 91% on the five-second clip. On the breakin clip's idle frames SAM
+sees the hands less curled than FlowHMR's default pose (proximal bend 22–38°
+against 50–55°). A camera that moves without turning is not detected, and its
+motion would be read as the person's.
