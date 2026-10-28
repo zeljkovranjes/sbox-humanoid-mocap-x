@@ -42,18 +42,20 @@ internal sealed class SamGpuFeatures : IDisposable
     }
 
     /// <summary>Writes 3072 channels in body/left/right order, matching FlowHMR's
-    /// first-pass decoder hooks. Requires original RGBA8 pixels, XYXY person box and
-    /// original-pixel intrinsics. Discard output on failure; keep inputs unchanged
-    /// until completion. No download or external process is used.</summary>
+    /// first-pass decoder hooks, and optionally the frame's <see cref="SamObservations"/>.
+    /// Requires original RGBA8 pixels, XYXY person box and original-pixel intrinsics.
+    /// Discard output on failure; keep inputs unchanged until completion. No download or
+    /// external process is used.</summary>
     internal async Task RunAsync(ReadOnlyMemory<byte> rgba, int width, int height, ReadOnlyMemory<float> personBox,
-        ReadOnlyMemory<float> intrinsics, Memory<float> output, CancellationToken token = default)
+        ReadOnlyMemory<float> intrinsics, Memory<float> output, CancellationToken token = default, Memory<float> observations = default)
     {
         ThreadSafe.AssertIsMainThread(); ObjectDisposedException.ThrowIf(disposed, this);
         if (running) throw new InvalidOperationException("Await current SAM features before starting another frame.");
         token.ThrowIfCancellationRequested();
         if (width < 1 || height < 1 || width >= short.MaxValue || height >= short.MaxValue || rgba.Length != (long)width * height * 4
             || personBox.Length != 4 || intrinsics.Length != 9 || output.Length != Elements || personBox.Span.Overlaps(output.Span)
-            || intrinsics.Span.Overlaps(output.Span) || rgba.Span.Overlaps(MemoryMarshal.AsBytes(output.Span)))
+            || intrinsics.Span.Overlaps(output.Span) || rgba.Span.Overlaps(MemoryMarshal.AsBytes(output.Span))
+            || observations.Length is not (0 or SamObservations.Elements))
             throw new ArgumentException("SAM feature frame, box, intrinsics or output dimensions are invalid or overlap.");
         var box = personBox.Span;
         crop = new(box[0], box[1], box[2], box[3], shape); intrinsics.Span.CopyTo(camera);
@@ -70,8 +72,10 @@ internal sealed class SamGpuFeatures : IDisposable
                 var pointOutput = points.AsSpan(pass * SamKeypoints.Count * 2, SamKeypoints.Count * 2);
                 decoder.ImageKeypoints.CopyTo(pointOutput);
                 if (pass == 1) for (var i = 0; i < pointOutput.Length; i += 2) pointOutput[i] = width - pointOutput[i] - 1;
+                if (!observations.IsEmpty) Observe(decoder, observations.Span);
                 if (pass == 0) { await Task.Run(detectHands, token); await GameTask.MainThread(); }
             }
+            if (!observations.IsEmpty) points.CopyTo(observations.Span.Slice(SamObservations.ImageKeypoints));
         }
         finally { await GameTask.MainThread(); running = false; source = default; cancellation = default; }
     }
@@ -83,6 +87,21 @@ internal sealed class SamGpuFeatures : IDisposable
         crop.Prepare(source.Span, width, height, pixels, cancellation, pass == 1);
         // Upstream keeps the original camera intrinsics even for the mirrored left image.
         rayEncoder.Prepare(camera, affine, rays, cancellation);
+    }
+
+    void Observe(SamGpuPoseDecoder decoder, Span<float> observations)
+    {
+        if (pass == 0)
+        {
+            decoder.Keypoints.CopyTo(observations.Slice(SamObservations.BodyKeypoints));
+            decoder.CameraTranslation.CopyTo(observations.Slice(SamObservations.Translation));
+            return;
+        }
+        // Hand passes see one right hand; the left pass's image was mirrored, so its X axis flips back.
+        var hand = decoder.Keypoints.Slice(SamObservations.RightHandStart * 3, SamObservations.HandPoints * 3);
+        var target = observations.Slice(pass == 1 ? SamObservations.LeftHand : SamObservations.RightHand, hand.Length);
+        hand.CopyTo(target);
+        if (pass == 1) for (var i = 0; i < target.Length; i += 3) target[i] = -target[i];
     }
 
     void DetectHands() => handBoxes.Run(body.Tokens.Slice(SamInitialTokens.HandBoxStart * FeatureWidth, FeatureWidth * 2), crop, boxes, cancellation);

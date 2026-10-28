@@ -23,6 +23,10 @@ internal sealed class SamGpuPoseDecoder : IDisposable
     bool running, disposed;
     internal ReadOnlySpan<float> Tokens => decoded;
     internal ReadOnlySpan<float> ImageKeypoints => projected;
+    /// <summary>The 70 MHR keypoints in camera axes, in metres relative to the body root.</summary>
+    internal ReadOnlySpan<float> Keypoints => feedback.Pose.Keypoints;
+    /// <summary>The body root's position in camera coordinates, in metres.</summary>
+    internal ReadOnlySpan<float> CameraTranslation => translation;
 
     internal SamGpuPoseDecoder(FlowWeights weights, SamDecoderShape shape, SamInitialTokens initial, SamDecoderFeedback feedback, bool hand,
         FlowGpuWeights shared = null)

@@ -27,16 +27,17 @@ internal sealed class FlowVideoProcessor
     /// <summary>Reconstructs one person's motion from a 30 fps timeline, over the frames in
     /// which they are visible; the motion's start time is the first of those, in seconds from
     /// the timeline's start. Requires installed verified models and a live GPU. The caller owns
-    /// frames; all failures/cancellation propagate and no partial motion is returned.</summary>
-    internal async Task<(FlowMotion Motion, PersonSpan Person)> RunAsync(ICaptureFrames frames, CancellationToken cancellation)
+    /// frames; all failures/cancellation propagate and no partial motion is returned. Detail
+    /// refines the motion's document; see <see cref="ObservedDetail"/>.</summary>
+    internal async Task<(FlowMotion Motion, PersonSpan Person, ObservedDetail Detail)> RunAsync(ICaptureFrames frames, CancellationToken cancellation)
     {
         var person = await DetectAsync(frames, cancellation);
         var visible = person.Visible(frames);
         var camera = await CameraAsync(visible, cancellation);
-        var features = await FeaturesAsync(visible, person.Boxes, camera.Intrinsics, cancellation);
+        var (features, observations) = await FeaturesAsync(visible, person.Boxes, camera.Intrinsics, cancellation);
         var motion = await GenerateAsync(features, camera.Rotations, visible.Count, cancellation);
         motion.StartTime = person.StartSeconds;
-        return (motion, person);
+        return (motion, person, new ObservedDetail(observations, camera.Rotations));
     }
 
     internal async Task<PersonSpan> DetectAsync(ICaptureFrames frames, CancellationToken cancellation)
@@ -99,12 +100,14 @@ internal sealed class FlowVideoProcessor
         return (rotations, intrinsics);
     }
 
-    internal async Task<float[]> FeaturesAsync(ICaptureFrames frames, ReadOnlyMemory<float> boxes, ReadOnlyMemory<float> intrinsics, CancellationToken cancellation)
+    /// <summary>FlowHMR's per-frame SAM features and, beside them, the frames' <see cref="SamObservations"/>.</summary>
+    internal async Task<(float[] Features, float[] Observations)> FeaturesAsync(ICaptureFrames frames, ReadOnlyMemory<float> boxes, ReadOnlyMemory<float> intrinsics, CancellationToken cancellation)
     {
         if (boxes.Length != frames.Count * 4 || intrinsics.Length != frames.Count * 9)
             throw new ArgumentException("Capture needs one person box and intrinsic matrix per frame.");
         SamDecoder.Finite(boxes.Span); SamDecoder.Finite(intrinsics.Span);
         var features = new float[frames.Count * SamGpuFeatures.Elements];
+        var observations = new float[frames.Count * SamObservations.Elements];
         var laneCount = Math.Min(Lanes(), frames.Count);
         using var shared = new FlowGpuWeights();
         SamGpuFeatures[] lanes = null; var running = new Task[laneCount];
@@ -123,13 +126,14 @@ internal sealed class FlowVideoProcessor
                     Report($"Reconstructing body and hands · {i + 1}/{frames.Count}", 0.20 + 0.77 * start / frames.Count);
                     await frames.ReadAsync(i, pixels[lane], cancellation); await GameTask.MainThread();
                     running[lane] = lanes[lane].RunAsync(pixels[lane], frames.Width, frames.Height, boxes.Slice(i * 4, 4), intrinsics.Slice(i * 9, 9),
-                        features.AsMemory(i * SamGpuFeatures.Elements, SamGpuFeatures.Elements), cancellation);
+                        features.AsMemory(i * SamGpuFeatures.Elements, SamGpuFeatures.Elements), cancellation,
+                        observations.AsMemory(i * SamObservations.Elements, SamObservations.Elements));
                 }
                 await Task.WhenAll(running[..count]);
                 Array.Clear(running);
                 reportProgress?.Invoke($"Reconstructed body and hands · {start + count}/{frames.Count}", 0.20 + 0.77 * (start + count) / frames.Count);
             }
-            return features;
+            return (features, observations);
         }
         finally
         {
