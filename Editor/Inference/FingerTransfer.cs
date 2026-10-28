@@ -22,6 +22,9 @@ internal static class FingerTransfer
     // Hand-pass and body-pass landmarks this many hand sizes apart in the image get no weight.
     const double Disagreement = 1.5;
     const int Segments = 15;
+    // Distal joints of relaxed fingers flex about two thirds as far as the proximal interphalangeal
+    // joints (Rijpkema and Girard, "Computer animation of knowledge-based human grasping", 1991).
+    const float TipCoupling = 2f / 3;
     static readonly BoneRole[] Left =
     {
         BoneRole.ThumbProxL, BoneRole.ThumbMidL, BoneRole.ThumbDistL, BoneRole.IndexProxL, BoneRole.IndexMidL, BoneRole.IndexDistL,
@@ -89,7 +92,21 @@ internal static class FingerTransfer
                 if (!(direction.LengthSquared() > 1e-12f) || !float.IsFinite(direction.X + direction.Y + direction.Z)) return 0;
                 directions[finger * 3 + segment] = Vector3.Normalize(direction);
             }
+        for (var finger = 1; finger < 5; finger++) CoupleTip(directions.Slice(finger * 3, 3));
         return Math.Clamp(Disagreement - ImageDistance(observation, left), 0, 1);
+    }
+
+    /// <summary>Bends a finger's tip joint at least <see cref="TipCoupling"/> times as far as its
+    /// middle joint, in the same plane. SAM's hand passes leave tips nearly straight (1–13° where
+    /// the middle joint bends 22–38°), so relaxed fingers otherwise look stiff.</summary>
+    static void CoupleTip(Span<Vector3> segments)
+    {
+        var axis = Vector3.Cross(segments[0], segments[1]);
+        if (!(axis.LengthSquared() > 1e-8f)) return;
+        var middle = MathF.Acos(Math.Clamp(Vector3.Dot(segments[0], segments[1]), -1f, 1f));
+        var tip = MathF.Acos(Math.Clamp(Vector3.Dot(segments[1], segments[2]), -1f, 1f));
+        if (tip >= TipCoupling * middle) return;
+        segments[2] = Vector3.Transform(segments[1], Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), TipCoupling * middle));
     }
 
     /// <summary>Mean image distance between the hand pass's and the body pass's hand landmarks,
