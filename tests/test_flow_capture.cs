@@ -6,21 +6,23 @@ static class FlowCaptureTests
 {
     internal static async Task Run()
     {
-        var hosting = new HostingSettings();
-        var hosted = new RecordingCapture("hosted"); var local = new RecordingCapture("local");
-        var capture = new FlowCapture(new CaptureOptions(), hosting, hosted, local) { Blocked = "Finish setup first." };
+        var hosting = new HostingSettings(); var machine = new SshSettings();
+        var hosted = new RecordingCapture("hosted"); var remote = new RecordingCapture("remote"); var local = new RecordingCapture("local");
+        var capture = new FlowCapture(new CaptureOptions(), hosting, hosted, machine, remote, local) { Blocked = "Finish setup first." };
 
-        // A held-back capture reports its reason and never reaches either backend.
+        // A held-back capture reports its reason and never reaches any backend.
         MotionTests.Equal("Finish setup first.", capture.UnavailableReason);
         MotionTests.Throws<InvalidOperationException>(() => capture.CaptureAsync("clip.mp4", 0, null, null, default));
-        MotionTests.Equal(0, hosted.Calls + local.Calls);
+        MotionTests.Equal(0, hosted.Calls + remote.Calls + local.Calls);
 
         capture.Blocked = null;
         MotionTests.Equal("local", await capture.CaptureAsync("clip.mp4", 0, null, null, default));
+        machine.Enabled = true;
+        MotionTests.Equal("remote", await capture.CaptureAsync("clip.mp4", 0, null, null, default));
         hosting.Enabled = true;
         MotionTests.Equal("hosted", await capture.CaptureAsync("clip.mp4", 0, null, null, default));
-        MotionTests.Equal(1, hosted.Calls); MotionTests.Equal(1, local.Calls);
-        Console.WriteLine("PASS: capture routing holds back blocked captures and picks the hosted or local backend");
+        MotionTests.Equal(1, hosted.Calls); MotionTests.Equal(1, remote.Calls); MotionTests.Equal(1, local.Calls);
+        Console.WriteLine("PASS: capture routing holds back blocked captures and picks the hosted, processing machine or local backend");
     }
 
     sealed class RecordingCapture(string result) : IBodyCapture

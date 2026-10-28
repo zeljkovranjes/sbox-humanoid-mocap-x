@@ -228,7 +228,10 @@ agent communication files before changing implementation ownership.
 
 `LocalCapture` connects timestamped Windows decoding, installed-model
 verification and the complete C#/HLSL [upstream pipeline] to the workspace.
-There is no inference worker, Python runtime or process bridge in X.
+There is no inference worker, Python runtime or process bridge in X. The one
+exception, requested by users, is `SshCapture`: it starts the system `ssh` to
+run the standalone Linux worker on another machine (see
+`processing-machine.md`).
 `VideoFrames` streams original RGBA pixels to a temporary random-access
 30 fps timeline, selecting the displayed source frame at each sample time.
 It bounds dimensions, length and cache size, rejects changing dimensions or

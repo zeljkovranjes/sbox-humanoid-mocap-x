@@ -5,12 +5,13 @@ using Editor;
 
 namespace HumanoidMocapX.EditorTools;
 
-/// <summary>The saved processing choice (this computer or a provider) and browser sign-in, shared by
-/// the settings' Processing section, the account bar and the Account page.</summary>
+/// <summary>The saved processing choice (this computer, a provider or a processing machine over SSH)
+/// and browser sign-in, shared by the settings' Processing section, the account bar and the Account page.</summary>
 static class ProcessingSetup
 {
     internal const string SetupCookie = "HumanoidMocapX.SetupDone", HostedCookie = "HumanoidMocapX.Hosted",
-        AddressCookie = "HumanoidMocapX.HostUrl", ProviderCookie = "HumanoidMocapX.Provider", ProviderLabelCookie = "HumanoidMocapX.ProviderLabel";
+        AddressCookie = "HumanoidMocapX.HostUrl", ProviderCookie = "HumanoidMocapX.Provider", ProviderLabelCookie = "HumanoidMocapX.ProviderLabel",
+        SshCookie = "HumanoidMocapX.Ssh", SshAddressCookie = "HumanoidMocapX.SshAddress", SshWorkerCookie = "HumanoidMocapX.SshWorker";
 
     internal const string SetupMessage = "Finish setup first: open settings (top right) and choose where videos are processed.";
 
@@ -18,15 +19,25 @@ static class ProcessingSetup
     internal static string ModelsMessage(string missing)
         => $"Download the models first (missing: {missing}): open settings (top right) › Processing › Setup › Local models.";
 
-    /// <summary>True once this computer or a signed-in provider has been chosen.</summary>
+    /// <summary>True once this computer, a signed-in provider or a checked processing machine has been chosen.</summary>
     internal static bool Configured => EditorCookie.Get(SetupCookie, false);
 
-    /// <summary>Saves the choice; the window then rebuilds around it.</summary>
-    internal static void Choose(HostingSettings settings, bool hosted)
+    /// <summary>The saved processing machine; <see cref="SshSettings.Enabled"/> says whether it is the choice.</summary>
+    internal static SshSettings SavedMachine() => new()
     {
-        settings.Enabled = hosted;
-        EditorCookie.Set(HostedCookie, hosted); EditorCookie.Set(SetupCookie, true);
-        if (hosted) EditorCookie.Set(AddressCookie, settings.ServiceUrl);
+        Enabled = EditorCookie.Get(SshCookie, false),
+        Address = EditorCookie.Get(SshAddressCookie, ""),
+        Worker = EditorCookie.Get(SshWorkerCookie, SshSettings.DefaultWorker)
+    };
+
+    /// <summary>Saves the choice: the provider when <paramref name="hosted"/>, otherwise the processing
+    /// machine when <paramref name="remote"/>, otherwise this computer. The window then rebuilds around it.</summary>
+    internal static void Choose(HostingSettings settings, SshSettings machine, bool hosted, bool remote = false)
+    {
+        settings.Enabled = hosted; machine.Enabled = !hosted && remote;
+        EditorCookie.Set(HostedCookie, settings.Enabled); EditorCookie.Set(SshCookie, machine.Enabled); EditorCookie.Set(SetupCookie, true);
+        if (settings.Enabled) EditorCookie.Set(AddressCookie, settings.ServiceUrl);
+        if (machine.Enabled) { EditorCookie.Set(SshAddressCookie, machine.Address); EditorCookie.Set(SshWorkerCookie, machine.Worker); }
     }
 
     /// <summary>Signs in through the browser and remembers the provider for one-click sign-in

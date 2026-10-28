@@ -46,11 +46,11 @@ public static partial class MocapWindow
 
     /// <summary>The X part of Mocap adjustments: where videos are processed, the motion model and,
     /// for this computer, frames at once and model downloads.</summary>
-    internal static void Settings(Widget host, CaptureOptions options, HostingSettings hosting, Action applied, Action modelsChanged)
+    internal static void Settings(Widget host, CaptureOptions options, HostingSettings hosting, SshSettings machine, Action applied, Action modelsChanged)
     {
         // Where captures run, and the only place to set or change it.
         var where = SettingsSection.Add(host, "Processing", openByDefault: true);
-        where.Layout.Add(new ProcessingSection(where, hosting, applied, LabelWidth));
+        where.Layout.Add(new ProcessingSection(where, hosting, machine, applied, LabelWidth));
         // Built in Local models below; Base or Latest decides which FlowHMR file it checks.
         ModelDownloads list = null;
         var section = SettingsSection.Add(host, "Motion model", openByDefault: true);
@@ -69,7 +69,8 @@ public static partial class MocapWindow
             {
                 options.CameraInterval = interval; EditorCookie.Set("HumanoidMocapX.CameraInterval", interval);
             }, selected: interval == options.CameraInterval);
-        if (hosting.Enabled) return;
+        // The provider and the processing machine use their own GPU and models.
+        if (hosting.Enabled || machine.Enabled) return;
         var capacity = FlowVideoProcessor.LaneCapacity();
         var lanes = Row(section, "Parallel frames", Ui.Framed(new ComboBox(section)
         {

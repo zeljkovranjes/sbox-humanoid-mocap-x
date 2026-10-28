@@ -10,6 +10,8 @@
     <Compile Include="../Editor/CaptureModels.cs" Link="CaptureModels.cs" />
     <Compile Include="../Editor/VideoFrames.cs" Link="VideoFrames.cs" />
     <Compile Include="../Editor/FlowCapture.cs" Link="FlowCapture.cs" />
+    <Compile Include="../Editor/SshCapture.cs" Link="SshCapture.cs" />
+    <Compile Include="../Editor/SshSettings.cs" Link="SshSettings.cs" />
     <Compile Include="../Editor/HumanoidMocap/Video/DecodedVideoFrame.cs" Link="DecodedVideoFrame.cs" />
     <Compile Include="../Editor/HumanoidMocap/Video/WindowsVideoDecoder.cs" Link="WindowsVideoDecoder.cs" />
     <Compile Include="../Editor/HumanoidMocap/Video/IVideoDecoder.cs" Link="IVideoDecoder.cs" />
