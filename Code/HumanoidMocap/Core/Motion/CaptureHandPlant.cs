@@ -20,7 +20,8 @@ using Vector3 = System.Numerics.Vector3;
 /// held at the stretch's middle instead, a hand that slid while resting jumped to it at up to 2 m/s. A hand that travels more than <see cref="MaximumTravelCm"/> while low is wiping or
 /// sliding on purpose and is left alone, unless both feet are at least <see cref="SupportFeetCm"/> off the floor: then the
 /// hand carries the body (handstands, freezes, one-handed spins) and cannot slide, however far the capture drifts. The body
-/// is moved to stay over such a hand, the palm turns flat onto the floor and the fingers straighten along it.</summary>
+/// is moved to stay over such a hand, a body on one hand is tilted about that wrist until its weight is over it, the
+/// palm turns flat onto the floor and the fingers straighten along it.</summary>
 public static class CaptureHandPlant
 {
     /// <summary>A hand comes to rest within NearFloorCm of the floor and stays at rest until it rises past LiftCm: the capture
@@ -115,6 +116,7 @@ public static class CaptureHandPlant
             }
         }
         CarryBody( frames, rig, bearings, wrist, up, blend );
+        Balance( frames, target, bearings, goals, up );
         var held = 0;
         for ( var f = 0; f < frames.Count; f++ )
         {
@@ -196,6 +198,53 @@ public static class CaptureHandPlant
         var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
         for ( var f = 0; f < frames.Count; f++ )
             if ( shift[f] is { } move ) foreach ( var root in roots ) frames[f][root].Pos += move;
+    }
+
+    /// <summary>Segment mass fractions (de Leva 1996) between joint pairs, for the body's centre of mass.</summary>
+    static readonly (BoneRole From, BoneRole To, float Mass)[] Segments =
+    {
+        (BoneRole.Hips, BoneRole.Neck, .43f), (BoneRole.Head, BoneRole.Head, .08f),
+        (BoneRole.UpperArmL, BoneRole.LowerArmL, .027f), (BoneRole.UpperArmR, BoneRole.LowerArmR, .027f),
+        (BoneRole.LowerArmL, BoneRole.HandL, .022f), (BoneRole.LowerArmR, BoneRole.HandR, .022f),
+        (BoneRole.UpperLegL, BoneRole.LowerLegL, .14f), (BoneRole.UpperLegR, BoneRole.LowerLegR, .14f),
+        (BoneRole.LowerLegL, BoneRole.FootL, .06f), (BoneRole.LowerLegR, BoneRole.FootR, .06f)
+    };
+    /// <summary>A body on one hand is tilted at most this far to bring its weight over the hand.</summary>
+    public const float MaximumBalanceDegrees = 30;
+
+    /// <summary>Tilts a body that rests on a single hand about that wrist until its centre of mass is over it: on one
+    /// hand it cannot be anywhere else without falling. The breakin clip's one-handed spin leaned 14° off the hand
+    /// in the capture where SAM saw 5°, which swung the free hand on a circle a quarter wider. Two hands or a hand and
+    /// the head down share the weight, and the body is left as captured.</summary>
+    static void Balance( List<XForm[]> frames, TargetRig target, List<(int Hand, int First, int Last, Vector3 Anchor)> bearings,
+        Dictionary<int, (Vector3 Position, float Weight, bool Bearing)[]> goals, Vector3 up )
+    {
+        var rig = target.Skeleton; var segments = Segments.Select( s => (A: target.BoneForRole( s.From ), B: target.BoneForRole( s.To ), s.Mass) ).ToArray();
+        if ( bearings.Count == 0 || segments.Any( s => s.A is null || s.B is null ) ) return;
+        var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
+        var world = new XForm[rig.Count];
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            var on = bearings.Where( s => s.First <= f && f <= s.Last ).ToArray();
+            if ( on.Length != 1 ) continue;
+            var hand = on[0].Hand; var weight = goals[hand][f].Weight; if ( weight <= 0 ) continue;
+            FkUtil.ToWorld( frames[f], rig, world );
+            var centre = Vector3.Zero; var mass = 0f;
+            foreach ( var (a, b, m) in segments ) { centre += (world[a!.Value].Pos + world[b!.Value].Pos) * .5f * m; mass += m; }
+            var lever = centre / mass - world[hand].Pos;
+            if ( Vector3.Dot( lever, up ) <= 0 ) continue;
+            var tilt = FromTo( Vector3.Normalize( lever ), up );
+            var angle = 2 * MathF.Acos( Math.Clamp( MathF.Abs( tilt.W ), 0, 1 ) );
+            var limit = MaximumBalanceDegrees * MathF.PI / 180;
+            if ( angle > limit ) tilt = Quaternion.Slerp( Quaternion.Identity, tilt, limit / angle );
+            tilt = Quaternion.Normalize( Quaternion.Slerp( Quaternion.Identity, tilt, weight ) );
+            var pivot = world[hand].Pos;
+            foreach ( var root in roots )
+            {
+                frames[f][root].Pos = pivot + Vector3.Transform( frames[f][root].Pos - pivot, tilt );
+                frames[f][root].Rot = Quaternion.Normalize( tilt * frames[f][root].Rot );
+            }
+        }
     }
 
     /// <summary>The direction the palm faces, from the wrist and the index, middle and pinky knuckles. The back of a

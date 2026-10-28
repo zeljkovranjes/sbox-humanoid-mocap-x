@@ -33,6 +33,10 @@ static class HandPlantTests
                     if (after[handR].Pos.Z - after[handL].Pos.Z > lift) { lift = after[handR].Pos.Z - after[handL].Pos.Z; best = lifted; }
                 }
         rest = best;
+        // Stand it on the left wrist with its weight over it, then tip it 15°: a handstand leaning off its hand.
+        var balance = World(skeleton, rest); var wrist = balance[handL].Pos;
+        var tip = Quaternion.CreateFromAxisAngle(Vector3.UnitX, 15 * MathF.PI / 180) * MathQ.FromTo(Centre(rig, balance) - wrist, up);
+        foreach (var r in roots) rest[r] = new XForm(wrist + Vector3.Transform(rest[r].Pos - wrist, tip), Quaternion.Normalize(tip * rest[r].Rot));
         world = World(skeleton, rest);
         // The hand and its fingers only: rigs hang IK helpers under the hand that sit far from it.
         var handParts = Enumerable.Range(0, skeleton.Count).Where(b => b == handL || IsWithin(skeleton, b, handL) && rig.RoleOf(b)?.ToString() is { } role
@@ -63,13 +67,30 @@ static class HandPlantTests
             var a = last[chain[1]].Pos - last[chain[0]].Pos; var b = last[chain[2]].Pos - last[chain[1]].Pos;
             MotionTests.Check(Vector3.Dot(Vector3.Normalize(a), Vector3.Normalize(b)) > MathF.Cos(3 * MathF.PI / 180), finger + " finger of the support hand must lie straight");
         }
-        // The body is carried over the support hand, so the raised hand stops sliding with it but stays raised.
+        // On one hand, the body's weight is over it.
+        var centre = Centre(rig, last);
+        MotionTests.Check(Vector3.Distance(Flat(centre), Flat(last[handL].Pos)) * Inch < 3, $"Centre of mass {Vector3.Distance(Flat(centre), Flat(last[handL].Pos)) * Inch:F1} cm off the support hand");
+        MotionTests.Check(Vector3.Distance(Flat(Centre(rig, World(skeleton, rest))), Flat(world[handL].Pos)) * Inch > 5, "Fixture already balanced; the test proves nothing");
+        // The body is carried and balanced over the support hand; the raised hand moves with it but stays raised.
         MotionTests.Check(last[handR].Pos.Z * Inch > CaptureHandPlant.LiftCm / 1.5f, $"The raised hand was pulled to {last[handR].Pos.Z * Inch:F0} cm");
-        MotionTests.Near(world[handR].Pos.Z, last[handR].Pos.Z, .5);
-        Console.WriteLine("PASS: hand plant holds a hand carrying the body however far the capture slides, palm flat and fingers straight, and leaves the raised hand free");
+        Console.WriteLine("PASS: hand plant holds a hand carrying the body however far the capture slides, balances the body over it, lays palm and fingers flat, and leaves the raised hand free");
     }
 
     static Vector3 Flat(Vector3 v) => v with { Z = 0 };
+
+    /// <summary>Centre of mass from de Leva's segment fractions, as the hand plant estimates it.</summary>
+    static Vector3 Centre(TargetRig rig, XForm[] world)
+    {
+        (BoneRole, BoneRole, float)[] segments =
+        {
+            (BoneRole.Hips, BoneRole.Neck, .43f), (BoneRole.Head, BoneRole.Head, .08f), (BoneRole.UpperArmL, BoneRole.LowerArmL, .027f), (BoneRole.UpperArmR, BoneRole.LowerArmR, .027f),
+            (BoneRole.LowerArmL, BoneRole.HandL, .022f), (BoneRole.LowerArmR, BoneRole.HandR, .022f), (BoneRole.UpperLegL, BoneRole.LowerLegL, .14f), (BoneRole.UpperLegR, BoneRole.LowerLegR, .14f),
+            (BoneRole.LowerLegL, BoneRole.FootL, .06f), (BoneRole.LowerLegR, BoneRole.FootR, .06f)
+        };
+        var sum = Vector3.Zero; var mass = 0f;
+        foreach (var (a, b, m) in segments) { sum += (world[rig.BoneForRole(a)!.Value].Pos + world[rig.BoneForRole(b)!.Value].Pos) * .5f * m; mass += m; }
+        return sum / mass;
+    }
     static bool IsWithin(HumanoidMocapX.Core.Skeleton.Skeleton skeleton, int bone, int ancestor)
     {
         for (var b = bone; b >= 0; b = skeleton[b].ParentIndex) if (b == ancestor) return true;
