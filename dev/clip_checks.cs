@@ -38,8 +38,8 @@ public static class ClipChecks
         var boxes = person.Boxes; await Save("boxes.json", boxes); await Save("timings.json", times); timer.Restart();
         var camera = await processor.CameraAsync(frames, cancellation); times["Camera"] = timer.Elapsed.TotalSeconds;
         await Save("rotations.json", camera.Rotations); await Save("intrinsics.json", camera.Intrinsics); await Save("timings.json", times); timer.Restart();
-        var features = await processor.FeaturesAsync(frames, boxes, camera.Intrinsics, cancellation); times["Features"] = timer.Elapsed.TotalSeconds;
-        await Save("features.json", features); await Save("timings.json", times); timer.Restart();
+        var (features, observations) = await processor.FeaturesAsync(frames, boxes, camera.Intrinsics, cancellation); times["Features"] = timer.Elapsed.TotalSeconds;
+        await Save("features.json", features); await Save("observations.json", observations); await Save("timings.json", times); timer.Restart();
         var motion = await processor.GenerateAsync(features, camera.Rotations, frames.Count, cancellation); times["Generation"] = timer.Elapsed.TotalSeconds;
         var exports = await Export(fixture, motion, directory, cancellation); await Save("timings.json", times);
         var result = new { Passed = true, PredecodedFixture = true, Frames = frames.Count, Seconds = frames.Count / 30.0, StageSeconds = times, Exports = exports };
