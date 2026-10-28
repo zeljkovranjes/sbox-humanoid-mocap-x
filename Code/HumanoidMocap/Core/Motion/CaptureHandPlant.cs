@@ -68,6 +68,9 @@ public static class CaptureHandPlant
             if ( fingers.Take( 2 ).Any( f => f.Any( b => b is null ) ) ) return null;
             return fingers.Where( f => f.All( b => b is int ) ).SelectMany( f => f.Select( b => b!.Value ) ).ToArray();
         } );
+        var thumbs = arms.ToDictionary( a => a.C, a => (target.BoneForRole( BoneRole.HandL ) == a.C
+                ? new[] { BoneRole.ThumbProxL, BoneRole.ThumbMidL, BoneRole.ThumbDistL } : new[] { BoneRole.ThumbProxR, BoneRole.ThumbMidR, BoneRole.ThumbDistR } )
+            .Select( target.BoneForRole ).ToArray() is var bones && bones.All( b => b is int ) ? bones.Select( b => b!.Value ).ToArray() : null );
         var wrist = arms.ToDictionary( a => a.C, _ => new Vector3[frames.Count] );
         var lowest = arms.ToDictionary( a => a.C, _ => new float[frames.Count] );
         for ( var f = 0; f < frames.Count; f++ )
@@ -185,6 +188,7 @@ public static class CaptureHandPlant
                     var parent0 = rig[a.C].ParentIndex;
                     frame[a.C].Rot = Quaternion.Normalize( (parent0 < 0 ? Quaternion.Identity : Quaternion.Inverse( world[parent0].Rot )) * rotation );
                     FkUtil.ToWorld( frame, rig, world );
+                    if ( thumbs[a.C] is { } thumb ) LayThumb( frame, rig, world, thumb, up, weight );
                     var depth = parts[a.C].Min( b => Vector3.Dot( world[b].Pos - world[a.C].Pos, up ) );
                     // Down, the flat hand's lowest point is on the floor. Lifting, the hand rises as the capture lifts it from
                     // where it was held, never through the floor: forced down, a Citizen's lifting arm overreached and flipped.
@@ -476,6 +480,25 @@ public static class CaptureHandPlant
                 var straight = Quaternion.Normalize( FromTo( Vector3.Normalize( Vector3.Transform( own, rest ) ), Vector3.Normalize( inherited ) ) * rest );
                 frame[bone].Rot = Quaternion.Normalize( Quaternion.Slerp( frame[bone].Rot, straight, weight ) );
             }
+    }
+
+    /// <summary>Lays the thumb of a flat hand out along the floor beside the fingers, by <paramref name="weight"/>: its
+    /// first bone at the rig's rest splay from the hand, turned level with the floor, the rest of it straight. The
+    /// capture's thumb, curled for gripping, stayed tucked under the flat palm.</summary>
+    static void LayThumb( XForm[] frame, HumanoidMocapX.Core.Skeleton.Skeleton rig, XForm[] world, int[] thumb, Vector3 up, float weight )
+    {
+        var first = thumb[0];
+        frame[first].Rot = Quaternion.Normalize( Quaternion.Slerp( frame[first].Rot, rig[first].RestLocal.Rot, weight ) );
+        FkUtil.ToWorld( frame, rig, world );
+        var along = world[thumb[1]].Pos - world[first].Pos; var level = Flat( along, up );
+        if ( level.LengthSquared() > 1e-8f && along.LengthSquared() > 1e-8f )
+        {
+            var turn = Quaternion.Slerp( Quaternion.Identity, FromTo( Vector3.Normalize( along ), Vector3.Normalize( level ) ), weight );
+            var parent = rig[first].ParentIndex;
+            frame[first].Rot = Quaternion.Normalize( Quaternion.Inverse( world[parent].Rot ) * Quaternion.Normalize( turn * world[first].Rot ) );
+        }
+        Straighten( frame, rig, thumb, weight, first: 1 );
+        FkUtil.ToWorld( frame, rig, world );
     }
 
     /// <summary>Per frame of each hold, the heading a flat hand has on the floor (toward its middle knuckle), smoothed over
