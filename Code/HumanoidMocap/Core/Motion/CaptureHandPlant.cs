@@ -81,6 +81,8 @@ public static class CaptureHandPlant
         var minimum = Math.Max( 3, (int)MathF.Ceiling( MinimumSeconds * fps ) ); var blend = Math.Max( 1, (int)MathF.Round( BlendSeconds * fps ) );
         var still = StillMetresPerSecond * 100 * cm / fps;
         var goals = arms.ToDictionary( a => a.C, _ => new (Vector3 Position, float Weight, bool Bearing, bool Lifting)[frames.Count] );
+        // Which weight-bearing stretch (index into bearings) wrote each goal, -1 for none.
+        var owner = arms.ToDictionary( a => a.C, _ => Enumerable.Repeat( -1, frames.Count ).ToArray() );
         // Weight-bearing stretches (hand, first, last, landing point), to move the body over them below.
         var bearings = new List<(int Hand, int First, int Last, Vector3 Anchor)>();
         foreach ( var a in arms )
@@ -125,7 +127,7 @@ public static class CaptureHandPlant
                             // Palm on the floor: the wrist at the held place, as high as puts the hand's lowest point on the floor.
                             var w = Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
                             var goal = anchor + up * (Vector3.Dot( p[i], up ) - low[i]);
-                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (goal, w, bearing, false);
+                            if ( w > goals[a.C][i].Weight ) { goals[a.C][i] = (goal, w, bearing, false); owner[a.C][i] = bearing ? bearings.Count - 1 : -1; }
                         }
                         // Everything held at the last frame, height included, is let go gradually; a flat palm curls back
                         // over the same frames instead of snapping.
@@ -133,14 +135,22 @@ public static class CaptureHandPlant
                         for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
                         {
                             var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (p[i] + carried, w, bearing, true);
+                            if ( w > goals[a.C][i].Weight ) { goals[a.C][i] = (p[i] + carried, w, bearing, true); owner[a.C][i] = bearing ? bearings.Count - 1 : -1; }
                         }
                     }
                 }
                 f = e + 1;
             }
         }
-        CarryBody( frames, rig, bearings, wrist, up, blend );
+        // Each stretch lands where the carried body puts its hand, and a hand being let go keeps its offset from where the
+        // carried body puts it at the release, fading, rather than from the uncarried capture: while the carry eased out, a
+        // Citizen's lifting hand was sent out of reach and its arm swung 45 cm.
+        var (landed, moved) = CarryBody( frames, rig, bearings, wrist, up, blend );
+        foreach ( var a in arms )
+            for ( var i = 0; i < frames.Count; i++ )
+                if ( owner[a.C][i] is var b && b >= 0 )
+                    goals[a.C][i].Position += landed[b] + (goals[a.C][i].Lifting ? moved[i] - moved[bearings[b].Last] : Vector3.Zero);
+        for ( var b = 0; b < bearings.Count; b++ ) bearings[b] = bearings[b] with { Anchor = bearings[b].Anchor + landed[b] };
         var seen = arms.ToDictionary( a => a.C, a => observed?.GetValueOrDefault( target.BoneForRole( BoneRole.HandL ) == a.C ? BoneRole.HandL : BoneRole.HandR ) is { } mask
             && mask.Length == frames.Count ? mask : new bool[frames.Count] );
         SecondHands( frames, rig, arms, parts, supported, seen, goals, bearings, up, cm, still, minimum, blend );
@@ -222,21 +232,42 @@ public static class CaptureHandPlant
 
     /// <summary>Moves the whole body so each weight-bearing hand stays where it landed, the way a support hand pins a
     /// handstand; the move eases out over <paramref name="blend"/> frames after the hand lifts. Where both hands carry
-    /// the body, the one lower on average leads and the other is reached with the arm.</summary>
-    static void CarryBody( List<XForm[]> frames, HumanoidMocapX.Core.Skeleton.Skeleton rig, List<(int Hand, int First, int Last, Vector3 Anchor)> bearings,
+    /// the body, the one lower on average leads and the other is reached with the arm. Returns, per stretch, how far
+    /// its landing point moved with the carried body, and the body's move per frame.</summary>
+    static (Vector3[] Landed, Vector3[] Moved) CarryBody( List<XForm[]> frames, HumanoidMocapX.Core.Skeleton.Skeleton rig, List<(int Hand, int First, int Last, Vector3 Anchor)> bearings,
         Dictionary<int, Vector3[]> wrist, Vector3 up, int blend )
     {
-        if ( bearings.Count == 0 ) return;
-        var shift = new Vector3?[frames.Count];
-        foreach ( var (hand, first, last, anchor) in bearings.OrderBy( s => Enumerable.Range( s.First, s.Last - s.First + 1 ).Average( i => Vector3.Dot( wrist[s.Hand][i], up ) ) ) )
+        var landed = new Vector3[bearings.Count];
+        if ( bearings.Count == 0 ) return (landed, new Vector3[frames.Count]);
+        // The move per frame, which stretch leads it, and how much of that stretch's move remains (1 while its hand is down).
+        var shift = new Vector3?[frames.Count]; var lead = Enumerable.Repeat( -1, frames.Count ).ToArray(); var share = new float[frames.Count];
+        // A hand that is down leads before any other hand's letting go.
+        var order = Enumerable.Range( 0, bearings.Count ).OrderBy( s => Enumerable.Range( bearings[s].First, bearings[s].Last - bearings[s].First + 1 ).Average( i => Vector3.Dot( wrist[bearings[s].Hand][i], up ) ) ).ToArray();
+        foreach ( var s in order )
         {
-            for ( var i = first; i <= last; i++ ) shift[i] ??= anchor - Flat( wrist[hand][i], up );
-            var carried = shift[last]!.Value;
+            var (hand, first, last, anchor) = bearings[s];
+            for ( var i = first; i <= last; i++ ) if ( shift[i] is null ) { shift[i] = anchor - Flat( wrist[hand][i], up ); lead[i] = s; share[i] = 1; }
+        }
+        foreach ( var s in order )
+        {
+            var (hand, _, last, anchor) = bearings[s];
+            var carried = anchor - Flat( wrist[hand][last], up );
             for ( var i = last + 1; i <= Math.Min( frames.Count - 1, last + blend ); i++ )
             {
                 var w = 1 - (i - last) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                shift[i] ??= carried * w;
+                if ( shift[i] is null ) { shift[i] = carried * w; lead[i] = s; share[i] = w; }
             }
+        }
+        // In time order, a stretch that takes over while another still moves the body carries that move on instead of
+        // dropping it, and lands where the moved body puts its hand; so does a hand that only follows another's lead. On
+        // the Citizen the breakin clip's left hand touched down again one frame after lifting and jumped 30 cm.
+        foreach ( var s in Enumerable.Range( 0, bearings.Count ).OrderBy( s => bearings[s].First ) )
+        {
+            var first = bearings[s].First;
+            if ( lead[first] != s ) { landed[s] = shift[first] ?? Vector3.Zero; continue; }
+            if ( first == 0 || lead[first - 1] < 0 || lead[first - 1] == s ) continue;
+            landed[s] = shift[first - 1]!.Value;
+            for ( var i = 0; i < frames.Count; i++ ) if ( lead[i] == s ) shift[i] += landed[s] * share[i];
         }
         // Smoothed over time: the capture's frame-to-frame jitter at the hand would otherwise shake the whole body. The window
         // stays symmetric and inside the carried frames, shrinking toward their ends, so the body is not moved before the hand
@@ -258,6 +289,7 @@ public static class CaptureHandPlant
         var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
         for ( var f = 0; f < frames.Count; f++ )
             if ( smoothed[f].LengthSquared() > 0 ) foreach ( var root in roots ) frames[f][root].Pos += smoothed[f];
+        return (landed, smoothed);
     }
 
     /// <summary>Plants a hand that bears weight beside the one carrying the body: where the video shows it on the floor
