@@ -189,7 +189,10 @@ public static class CaptureHandPlant
                     if ( !lifting ) { lift[a.C] = Math.Max( 0, -depth ) - Vector3.Dot( position, up ); position = Flat( position, up ) + up * Math.Max( 0, -depth ); }
                     else position = Flat( position, up ) + up * Math.Max( Math.Max( 0, -depth ), Vector3.Dot( position, up ) + lift[a.C] );
                 }
-                var goal = Vector3.Lerp( world[a.C].Pos, position, weight );
+                // A hand that is down stays on its spot from the frame it lands; only its height eases in. Easing the whole
+                // place in slid the landing hand on with the capture for up to three frames, up to 6 cm a frame.
+                var goal = lifting ? Vector3.Lerp( world[a.C].Pos, position, weight )
+                    : Flat( position, up ) + up * float.Lerp( Vector3.Dot( world[a.C].Pos, up ), Vector3.Dot( position, up ), weight );
                 // Out of the straight arm's reach (a seated dancer rising off a planted hand), the shoulder drops
                 // toward the hand as a person's does: the clavicle turns, up to MaximumShoulderDegrees.
                 var reach = Vector3.Distance( world[a.A].Pos, world[a.B].Pos ) + Vector3.Distance( world[a.B].Pos, world[a.C].Pos );
