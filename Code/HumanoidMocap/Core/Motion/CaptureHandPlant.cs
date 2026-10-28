@@ -45,7 +45,9 @@ public static class CaptureHandPlant
     /// <returns>The number of hand samples held.</returns>
     /// <param name="observed">Frames in which the video shows each hand on the floor under a raised body, by hand role;
     /// such a hand is planted even where the capture lifted it.</param>
-    public static int Apply( List<XForm[]> frames, TargetRig target, TargetUpAxis axis, float fps, IReadOnlyDictionary<BoneRole, bool[]> observed = null )
+    /// <param name="spread">Per frame, how far apart the performer's hands are on the floor, in shoulder widths; a second
+    /// hand landing beside a held one keeps that spacing on this rig.</param>
+    public static int Apply( List<XForm[]> frames, TargetRig target, TargetUpAxis axis, float fps, IReadOnlyDictionary<BoneRole, bool[]> observed = null, float[] spread = null )
     {
         if ( frames.Count < 3 || fps <= 0 ) return 0;
         var rig = target.Skeleton; var up = axis == TargetUpAxis.YUpCm ? Vector3.UnitY : Vector3.UnitZ;
@@ -156,7 +158,7 @@ public static class CaptureHandPlant
         for ( var b = 0; b < bearings.Count; b++ ) bearings[b] = bearings[b] with { Anchor = bearings[b].Anchor + landed[b] };
         var seen = arms.ToDictionary( a => a.C, a => observed?.GetValueOrDefault( target.BoneForRole( BoneRole.HandL ) == a.C ? BoneRole.HandL : BoneRole.HandR ) is { } mask
             && mask.Length == frames.Count ? mask : new bool[frames.Count] );
-        SecondHands( frames, rig, arms, parts, supported, seen, goals, bearings, up, cm, still, minimum, blend );
+        SecondHands( frames, rig, arms, parts, supported, seen, goals, bearings, up, cm, still, minimum, blend, spread is { } s0 && s0.Length == frames.Count ? s0 : null );
         Balance( frames, target, bearings, goals, up, fps );
         KeepArmBend( frames, target, arms, goals, supported, up, blend );
         var heading = arms.ToDictionary( a => a.C, a => chains[a.C] is { } chain
@@ -325,12 +327,12 @@ public static class CaptureHandPlant
     /// spin is never still and stays free. The hand is let go over <paramref name="blend"/> frames.</summary>
     static void SecondHands( List<XForm[]> frames, HumanoidMocapX.Core.Skeleton.Skeleton rig, (int A, int B, int C)[] arms, Dictionary<int, int[]> parts,
         bool[] supported, Dictionary<int, bool[]> seen, Dictionary<int, (Vector3 Position, float Weight, bool Bearing, bool Lifting)[]> goals,
-        List<(int Hand, int First, int Last, Vector3 Anchor)> bearings, Vector3 up, float cm, float still, int minimum, int blend )
+        List<(int Hand, int First, int Last, Vector3 Anchor)> bearings, Vector3 up, float cm, float still, int minimum, int blend, float[] spread )
     {
         var world = new XForm[rig.Count]; var hands = arms.Select( a => a.C ).ToArray();
         var wrist = hands.ToDictionary( h => h, _ => new Vector3[frames.Count] ); var low = hands.ToDictionary( h => h, _ => new float[frames.Count] );
         // Whether the floor under each wrist lies within the arm's reach of its shoulder.
-        var reachable = hands.ToDictionary( h => h, _ => new bool[frames.Count] );
+        var reachable = hands.ToDictionary( h => h, _ => new bool[frames.Count] ); var shoulders = new float[frames.Count];
         for ( var f = 0; f < frames.Count; f++ )
         {
             FkUtil.ToWorld( frames[f], rig, world );
@@ -339,6 +341,7 @@ public static class CaptureHandPlant
                 wrist[h][f] = world[h].Pos; low[h][f] = parts[h].Min( p => Vector3.Dot( world[p].Pos, up ) );
                 var floor = world[h].Pos - up * low[h][f];
                 reachable[h][f] = Vector3.Distance( world[a].Pos, floor ) <= 1.02f * (Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[h].Pos ));
+                shoulders[f] = arms.Length > 1 ? Vector3.Distance( world[arms[0].A].Pos, world[arms[1].A].Pos ) : 0;
             }
         }
         foreach ( var h in hands )
@@ -359,6 +362,15 @@ public static class CaptureHandPlant
                     // jumped 66 cm to where the first pass had put it as the dancer pushed up.
                     var before = bearings.FindIndex( s => s.Hand == h && s.Last == f - 1 );
                     var anchor = before >= 0 ? bearings[before].Anchor : Flat( p[f], up ); var settle = Math.Max( 1, Math.Min( 3, (e - f) / 3 ) );
+                    // Landing beside the other hand, held down, it keeps the performer's spacing for this rig's shoulders: the
+                    // Citizen's short arms brought the breakin clip's freeze hands together under its face, 1.1 shoulder widths
+                    // apart where the dancer's were 1.4.
+                    var other = hands.FirstOrDefault( o => o != h && goals[o][f] is { Weight: >= 1, Lifting: false } );
+                    if ( before < 0 && spread is not null && other != 0 && spread[f] > 0 && shoulders[f] > 0 )
+                    {
+                        var held = Flat( goals[other][f].Position, up ); var apart = Flat( anchor - held, up );
+                        if ( apart.LengthSquared() > 1e-8f ) anchor = held + Vector3.Normalize( apart ) * spread[f] * shoulders[f];
+                    }
                     var after = bearings.FindIndex( s => s.Hand == h && s.First == e + 1 );
                     var last = after >= 0 ? bearings[after].Last : e;
                     if ( after >= 0 ) bearings.RemoveAt( after );

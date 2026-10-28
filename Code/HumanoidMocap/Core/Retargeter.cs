@@ -888,7 +888,7 @@ public static class Retargeter
                 if(hovering>0)AddNote(report,$"Kept on the floor in {hovering} frames: brief hovering above it or sinking into it removed.");
                 var seatedFrames=Motion.CaptureSeat.Apply(frames,scene,map,target.Rig,target.UpAxis);
                 if(seatedFrames>0)AddNote(report,$"Seated on the floor in {seatedFrames} frames: hips lowered onto the floor, feet and resting hands held in place.");
-                var handsHeld=Motion.CaptureHandPlant.Apply(frames,target.Rig,target.UpAxis,solved.Fps,PlantedHands(scene,map,frames.Count));
+                var handsHeld=Motion.CaptureHandPlant.Apply(frames,target.Rig,target.UpAxis,solved.Fps,PlantedHands(scene,map,frames.Count),HandSpread(scene,map,take));
                 if(handsHeld>0)AddNote(report,$"Hands on the floor held in place in {handsHeld} hand samples: palms resting on the floor no longer slide or hover.");
             }
         }
@@ -938,6 +938,23 @@ public static class Retargeter
 
         var looping = request.LoopingOverride ?? solved.Looping;
         return new Clip(clipName, solved.Fps, looping, frames);
+    }
+
+    /// <summary>Per source frame, how far apart the performer's hands are across the floor, in shoulder widths; null when the
+    /// source lacks hands or shoulders. The capture is Y-up.</summary>
+    static float[] HandSpread(SourceScene scene,MappingResult map,int take)
+    {
+        if(!map.RoleToBone.TryGetValue(BoneRole.HandL,out var handL)||!map.RoleToBone.TryGetValue(BoneRole.HandR,out var handR)
+            ||!map.RoleToBone.TryGetValue(BoneRole.UpperArmL,out var armL)||!map.RoleToBone.TryGetValue(BoneRole.UpperArmR,out var armR))return null;
+        var source=scene.Clips[take].Frames;var world=new XForm[scene.Skeleton.Count];var spread=new float[source.Count];
+        for(var f=0;f<source.Count;f++)
+        {
+            FkUtil.ToWorld(source[f],scene.Skeleton,world);
+            var apart=world[handL].Pos-world[handR].Pos;apart.Y=0;
+            var shoulders=Vector3.Distance(world[armL].Pos,world[armR].Pos);
+            spread[f]=shoulders>1e-6f?apart.Length()/shoulders:0;
+        }
+        return spread;
     }
 
     /// <summary>Frames where the capture marks each hand on the floor (stationary probability at least one half).</summary>
