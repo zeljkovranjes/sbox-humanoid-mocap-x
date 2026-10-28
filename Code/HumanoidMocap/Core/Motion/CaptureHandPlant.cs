@@ -109,12 +109,13 @@ public static class CaptureHandPlant
                             var goal = anchor + up * (Vector3.Dot( p[i], up ) - low[i]);
                             if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (goal, w, bearing);
                         }
-                        // Everything held at the last frame, height included, is let go gradually.
+                        // Everything held at the last frame, height included, is let go gradually; a flat palm curls back
+                        // over the same frames instead of snapping.
                         var carried = anchor + up * (Vector3.Dot( p[e], up ) - low[e]) - p[e];
                         for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
                         {
                             var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (p[i] + carried, w, false);
+                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (p[i] + carried, w, bearing);
                         }
                     }
                 }
@@ -278,7 +279,7 @@ public static class CaptureHandPlant
                     for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
                     {
                         var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                        if ( w > goals[h][i].Weight ) goals[h][i] = (p[i] + carried, w, false);
+                        if ( w > goals[h][i].Weight ) goals[h][i] = (p[i] + carried, w, true);
                     }
                 }
                 f = e + 1;
