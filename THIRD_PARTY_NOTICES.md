@@ -231,3 +231,13 @@ Source: https://github.com/DigitalRune/DigitalRune
 
 Windows Media Foundation signatures and GUIDs in the copied video decoder
 follow Windows SDK 10.0.26100.0; the decoder calls the OS directly.
+
+Tensor Inference
+----------------
+
+`Code/Tensor` and `Assets/shaders/tensor-inference` hold the author's Tensor
+Inference library (`notpointless.chomnr_tensor_inference`), copied at
+`586d7bd`, so this library does not depend on that package. Its namespace is
+renamed to `HumanoidMocapX.TensorInference`; shader asset paths are unchanged.
+Its development checks, tests and documentation are not included. It is
+distributed under the MIT license, reproduced in [LICENSE-MIT](LICENSE-MIT).

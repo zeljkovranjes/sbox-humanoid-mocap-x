@@ -2,7 +2,7 @@
   <ItemGroup>
     <Compile Include="../Editor/**/*.cs" Exclude="../Editor/obj/**;../Editor/Properties/**" />
     <ProjectReference Include="Core.csproj" />
-    <ProjectReference Include="../../../shaders/compute/tensor-inference/dev/Build.csproj" />
+    <ProjectReference Include="Tensor.csproj" />
     <Reference Include="$(FACEPUNCH_ENGINE)/bin/managed/*.dll" />
     <Reference Include="$(FACEPUNCH_ENGINE)/.vs/output/Base Editor Library.dll" />
     <Using Include="Sandbox.Internal.GlobalToolsNamespace" Static="true" />

@@ -7,9 +7,7 @@
   "IncludeSourceFiles": false,
   "Resources": null,
   "PublishUsedAssetsOnly": false,
-  "PackageReferences": [
-    "notpointless.chomnr_tensor_inference"
-  ],
+  "PackageReferences": [],
   "EditorReferences": null,
   "Mounts": null,
   "IsStandaloneOnly": false,
@@ -19,8 +17,7 @@
   "Metadata": {
     "Compiler": {
       "AssemblyReferences": [
-        "System.IO.Pipelines",
-        "package.notpointless.chomnr_tensor_inference"
+        "System.IO.Pipelines"
       ],
       "ReleaseMode": "Release"
     },

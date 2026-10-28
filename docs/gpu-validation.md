@@ -21,9 +21,9 @@ upstream Python models or successful video-to-animation capture.
 
 ## Editor setup
 
-The local checkout uses `Libraries/humanoid-mocap` and
-`Libraries/tensor-inference` symlinks to the sibling repositories. These
-development links are excluded locally and do not copy shared source.
+These checks ran with `Libraries/humanoid-mocap` and
+`Libraries/tensor-inference` symlinks to the sibling repositories, before both
+were built into this library.
 
 This Linux engine fork initially failed to index the tensor shader assets.
 Trusted editor automation compiled the nine `.shader` sources through the

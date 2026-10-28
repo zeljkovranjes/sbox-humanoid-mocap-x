@@ -19,19 +19,20 @@ dotnet build dev/GpuChecks.csproj -c Release -m:1
 dotnet run --project tests/MocapX.Tests.csproj -c Release
 dotnet build dev/Whitelist.csproj -c Release -m:1
 dotnet dev/bin/Whitelist/Release/net10.0/Whitelist.dll \
-  ../../shaders/compute/tensor-inference/dev/bin/Release/net10.0/package.notpointless.chomnr_tensor_inference.dll \
+  dev/bin/Tensor/Release/net10.0/package.notpointless.chomnr_humanoid_mocap_x.tensor.dll \
   dev/bin/Core/Release/net10.0/package.notpointless.chomnr_humanoid_mocap_x.dll
 ```
 
 `Whitelist` calls the installed engine's `AccessControl.VerifyAssembly` on
-both runtime assemblies, in dependency order. It does not change the engine's
-rules. Editor code has separate compiler permissions in s&box; network and
-disk access live in `Editor/`. The runtime `FlowMotion` DTO validates its own
-format without shared-library references; `Editor/FlowMotionAdapter.cs`
-converts it into the shared motion document.
+both halves of the runtime assembly. `dev/Tensor.csproj` builds `Code/Tensor`
+against the engine, so `dev/Core.csproj` and the tests stay engine-free. It
+does not change the engine's rules. Editor code has separate compiler
+permissions in s&box; network and disk access live in `Editor/`. The runtime
+`FlowMotion` DTO validates its own format without shared-library references;
+`Editor/FlowMotionAdapter.cs` converts it into the shared motion document.
 
-The three source library manifests explicitly select Release compilation,
-including in consumer editors. Build diagnostic projects with `-c Release`
+The library manifest explicitly selects Release compilation, including in
+consumer editors. Build diagnostic projects with `-c Release`
 when measuring performance. Debug and Release captures produced identical
 saved output for the five-second fixture, but substantially different timings.
 
@@ -311,13 +312,14 @@ parity remains unverified.
 
 [FlowHMR rotary implementation]: https://github.com/flowhmr/flowhmr/blob/89a78b821194897139b6df91a82f3128635ec6e8/flowhmr/network/mmdit/positional_encoding.py
 
-HLSL compute shaders are permitted inside s&box libraries. The separate
-`sbox/shaders/compute/tensor-inference` library contains C# dispatch and
-float32 matrix multiplication, normalization, attention, activation,
-modulation, packing, rotary-position and reduction kernels. It uses standard
-s&box GPU buffers and no external process. The attention kernel
-uses online softmax instead of allocating a dense score matrix. It accepts
-the same key ranges produced by `FlowAttention.CopyKeyRanges`.
+HLSL compute shaders are permitted inside s&box libraries. The built-in
+Tensor Inference code in `Code/Tensor` and `Assets/shaders/tensor-inference`
+contains C# dispatch and float32 matrix multiplication, normalization,
+attention, activation, modulation, packing, rotary-position and reduction
+kernels. It uses standard s&box GPU buffers and no external process. The
+attention kernel uses online softmax instead of allocating a dense score
+matrix. It accepts the same key ranges produced by
+`FlowAttention.CopyKeyRanges`.
 
 The GPU library runs every model stage through `FlowVideoProcessor`. `TensorBatch`
 records operations in an isolated 8×8 engine view, providing the graphics

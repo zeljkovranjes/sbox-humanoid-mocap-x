@@ -23,10 +23,9 @@ video-to-animation acceptance test yet.
 
 ## Configure the s&box library
 
-Load these local projects while the packages are unpublished:
+Load this local project while the package is unpublished:
 
 ```text
-sbox/shaders/compute/tensor-inference/tensor-inference.sbproj
 sbox/libraries/humanoid-mocap-x/humanoid-mocap-x.sbproj
 ```
 
