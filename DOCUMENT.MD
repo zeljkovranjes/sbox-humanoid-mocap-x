@@ -36,6 +36,10 @@ sbox/libraries/humanoid-mocap-x/humanoid-mocap-x.sbproj
    **This computer** (download the models, about 10 GB, under **Local
    models**) or **A provider**: enter its address, for example
    `mocap.example.com`, and press **Connect** to list its sign-in options.
+   **Processing machine (SSH)** instead runs the Linux worker on your own
+   machine: enter `user@host` and press **Check**. Its captures show the
+   worker's progress, and **Cancel** stops the worker there at any stage (see
+   [processing machine]).
 3. Choose one, such as **Sign in with Discord**. The browser opens the
    provider's sign-in page directly; after signing in, the editor continues
    by itself and the workspace unlocks.
@@ -51,6 +55,8 @@ sbox/libraries/humanoid-mocap-x/humanoid-mocap-x.sbproj
    **Add videos** queues several at once; when the provider allows only one
    job at a time, the rest wait in the panel and upload as jobs finish.
    Finished jobs open into the workspace with the open button.
+
+[processing machine]: docs/processing-machine.md
 
 **Mocap adjustments > Setup** shows where videos are processed, has **Change
 setup** to switch between your GPU and a provider, and sets **Base** or

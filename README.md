@@ -30,6 +30,13 @@ on `PATH`). Open **View > Humanoid Mocap X**, choose where videos are processed,
 then drop in a video. **Advanced** opens Mocap adjustments, where **Open motion…** loads
 an existing full-body `.hmotion` capture.
 
+To keep capture off this computer's GPU, choose **Processing machine (SSH)**
+and enter a Linux machine's `user@host` and the path of `humanoid-mocap-worker`
+there. Sign-in must work with an SSH key; **Check** confirms the worker starts
+before the choice is saved. See [processing machine].
+
+[processing machine]: docs/processing-machine.md
+
 <br>
 
 #### License
