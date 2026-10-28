@@ -38,22 +38,24 @@ internal sealed class LocalCapture(CaptureOptions options, string models, string
                 return await VideoFrames.CreateAsync(decoder.Read, duration, start, end, cache, Report, cancellationToken);
             }, cancellationToken);
             var installed = await ModelStore.InstalledAsync(models, selected.Model, Report, cancellationToken);
-            var motion = await new FlowVideoProcessor(installed, selected, progress, reportProgress).RunAsync(frames, cancellationToken);
-            motion.Video = video; motion.Name = Path.GetFileNameWithoutExtension(video); motion.StartTime = start;
-            var result = await Task.Run(() => Save(motion, cancellationToken), cancellationToken);
+            var (motion, person) = await new FlowVideoProcessor(installed, selected, progress, reportProgress).RunAsync(frames, cancellationToken);
+            motion.Video = video; motion.Name = Path.GetFileNameWithoutExtension(video); motion.StartTime += start;
+            var note = person.Note(start, frames.Count);
+            var result = await Task.Run(() => Save(motion, note, cancellationToken), cancellationToken);
             reportProgress?.Invoke("Motion is ready", 1);
             return result;
         }
         finally { Volatile.Write(ref active, 0); }
     }
 
-    async Task<string> Save(FlowMotion motion, CancellationToken token)
+    async Task<string> Save(FlowMotion motion, string note, CancellationToken token)
     {
         Directory.CreateDirectory(cache);
         var path = Path.Combine(cache, Guid.NewGuid().ToString("N") + ".hmotion"); var partial = path + ".partial";
         try
         {
             var document = motion.ToDocument();
+            if (note is not null) document.Diagnostics.Add(note);
             await using (var output = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, true))
                 await JsonSerializer.SerializeAsync(output, document, MotionDocument.JsonOptions, token);
             token.ThrowIfCancellationRequested(); File.Move(partial, path);

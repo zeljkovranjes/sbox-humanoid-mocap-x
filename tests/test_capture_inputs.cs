@@ -7,15 +7,24 @@ static class CaptureInputTests
         var person = new YoloBox(10, 20, 110, 220, .8f); var other = new YoloBox(250, 10, 290, 100, .95f);
         var track = new PersonTrack(5); track.Add([other, person]); track.Add([person with { Left = 12, Right = 112 }, other]);
         track.Add([]); track.Add([person with { Left = 16, Right = 116 }]); track.Add([person with { Left = 18, Right = 118 }]);
-        var boxes = track.Complete().Span;
+        var span = track.Complete(); var boxes = span.Boxes;
+        MotionTests.Equal(0, span.First); MotionTests.Equal(5, span.Count); MotionTests.Check(span.Note(2, 5) is null, "A fully visible person needs no note");
         for (var i = 0; i < 5; i++) { MotionTests.Equal(10f + i * 2, boxes[i * 4]); MotionTests.Equal(110f + i * 2, boxes[i * 4 + 2]); }
         MotionTests.Throws<InvalidOperationException>(() => track.Add([person]));
-        var missing = new PersonTrack(2); MotionTests.Throws<InvalidOperationException>(() => missing.Add([]));
-        missing.Add([person]); missing.Add([]); MotionTests.Throws<InvalidOperationException>(() => missing.Complete());
+        var nobody = new PersonTrack(2); nobody.Add([]); nobody.Add([]); MotionTests.Throws<InvalidOperationException>(() => nobody.Complete());
+        var unfinished = new PersonTrack(2); unfinished.Add([person]); MotionTests.Throws<InvalidOperationException>(() => unfinished.Complete());
+        // The capture starts where the person first appears and ends at their last detection.
+        var late = new PersonTrack(6); late.Add([]); late.Add([]); late.Add([person]); late.Add([]); late.Add([person with { Left = 14, Right = 114 }]); late.Add([]);
+        var visible = late.Complete();
+        MotionTests.Equal(2, visible.First); MotionTests.Equal(3, visible.Count); MotionTests.Equal(12, visible.Boxes.Length);
+        MotionTests.Equal(12f, visible.Boxes[4]); MotionTests.Equal(14f, visible.Boxes[8]); MotionTests.Near(2 / 30d, visible.StartSeconds);
+        MotionTests.Equal("The person is in view from 1.07 s to 1.17 s of the video, so only that part was captured.", visible.Note(1, 6));
         var uncertain = new PersonTrack(2); uncertain.Add([person]);
         MotionTests.Throws<InvalidOperationException>(() => uncertain.Add([person, person with { Left = 11, Right = 111 }]));
-        var lost = new PersonTrack(17); lost.Add([person]); for (var i = 0; i < 15; i++) lost.Add([]);
-        MotionTests.Throws<InvalidOperationException>(() => lost.Add([other]));
+        // A person lost for more than half a second ends the capture; a later return is not joined on.
+        var lost = new PersonTrack(18); lost.Add([person]); for (var i = 0; i < 15; i++) lost.Add([]);
+        lost.Add([other]); lost.Add([person]);
+        var kept = lost.Complete(); MotionTests.Equal(0, kept.First); MotionTests.Equal(1, kept.Count);
         MotionTests.Throws<ArgumentException>(() => new PersonTrack(1).Add([person with { Left = float.NaN }]));
         var reuse = new PersonTrack(20); var input = new[] { person }; for (var i = 0; i < 4; i++) reuse.Add(input);
         var before = GC.GetAllocatedBytesForCurrentThread(); reuse.Add(input); MotionTests.Equal(0L, GC.GetAllocatedBytesForCurrentThread() - before);

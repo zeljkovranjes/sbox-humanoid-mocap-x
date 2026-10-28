@@ -24,18 +24,22 @@ internal sealed class FlowVideoProcessor
         this.reportProgress = reportProgress;
     }
 
-    /// <summary>Reconstructs one person's motion from a complete 30 fps timeline.
-    /// Requires installed verified models and a live GPU. The caller owns frames;
-    /// all failures/cancellation propagate and no partial motion is returned.</summary>
-    internal async Task<FlowMotion> RunAsync(ICaptureFrames frames, CancellationToken cancellation)
+    /// <summary>Reconstructs one person's motion from a 30 fps timeline, over the frames in
+    /// which they are visible; the motion's start time is the first of those, in seconds from
+    /// the timeline's start. Requires installed verified models and a live GPU. The caller owns
+    /// frames; all failures/cancellation propagate and no partial motion is returned.</summary>
+    internal async Task<(FlowMotion Motion, PersonSpan Person)> RunAsync(ICaptureFrames frames, CancellationToken cancellation)
     {
-        var boxes = await DetectAsync(frames, cancellation);
-        var camera = await CameraAsync(frames, cancellation);
-        var features = await FeaturesAsync(frames, boxes, camera.Intrinsics, cancellation);
-        return await GenerateAsync(features, camera.Rotations, frames.Count, cancellation);
+        var person = await DetectAsync(frames, cancellation);
+        var visible = person.Visible(frames);
+        var camera = await CameraAsync(visible, cancellation);
+        var features = await FeaturesAsync(visible, person.Boxes, camera.Intrinsics, cancellation);
+        var motion = await GenerateAsync(features, camera.Rotations, visible.Count, cancellation);
+        motion.StartTime = person.StartSeconds;
+        return (motion, person);
     }
 
-    internal async Task<float[]> DetectAsync(ICaptureFrames frames, CancellationToken cancellation)
+    internal async Task<PersonSpan> DetectAsync(ICaptureFrames frames, CancellationToken cancellation)
     {
         var network = new YoloNetwork(); Report("Loading person detector", 0);
         var weights = await Task.Run(() => YoloCheckpoint.Load(models.Detector, network, cancellation), cancellation);
@@ -67,7 +71,7 @@ internal sealed class FlowVideoProcessor
                 Array.Clear(running);
                 reportProgress?.Invoke($"Tracked person · {start + count}/{frames.Count}", 0.10 * (start + count) / frames.Count);
             }
-            return track.Complete().ToArray();
+            return track.Complete();
         }
         finally
         {
