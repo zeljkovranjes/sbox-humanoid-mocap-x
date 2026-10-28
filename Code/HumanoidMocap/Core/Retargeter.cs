@@ -912,6 +912,11 @@ public static class Retargeter
                 AddNote(report, FormattableString.Invariant($"Torso contact remains unresolved in {unresolvedContacts} hand samples (up to {maximumPenetration:F3} target units). Fixed arm lengths and wrist attitude prevented a clear proxy pose; review these contacts."));
         }
 
+        // Last of the pose cleanup: whatever snap a step above left (an IK flip, a contact pushed clear, a hold handed
+        // over) is pulled back onto its neighbours' path, keeping planted hands and feet where they are.
+        if (scene.CaptureSpace is not null && Motion.CaptureDespike.Apply(frames, target.Rig, target.UpAxis == TargetUpAxis.ZUpEngine ? 1 / 2.54f : 1f) is var smoothedSnaps && smoothedSnaps > 0)
+            AddNote(report, $"Snaps removed after cleanup: {smoothedSnaps} joint samples that left the smooth path through their neighbours were pulled back onto it.");
+
         // ---- IK helper bones (root_IK, IK targets, ikrule) need real baked channels ----
         if (context.HasIkBakedBones)
             IkBoneBaker.Bake(frames, target.Rig);
