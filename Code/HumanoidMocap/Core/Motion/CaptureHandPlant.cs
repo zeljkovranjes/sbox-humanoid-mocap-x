@@ -88,7 +88,17 @@ public static class CaptureHandPlant
             for ( var f = 0; f < frames.Count; )
             {
                 if ( !Resting( f, NearFloorCm ) ) { f++; continue; }
-                var e = f; while ( e + 1 < frames.Count && Resting( e + 1, LiftCm ) ) e++;
+                var e = f;
+                while ( true )
+                {
+                    while ( e + 1 < frames.Count && Resting( e + 1, LiftCm ) ) e++;
+                    // The lowest hand under a raised body still carries it while the capture lifts it for a moment: through the
+                    // breakin clip's one-handed spin it lifted the support hand up to 22 cm for three to five frames, and each
+                    // touch after that landed somewhere new. Up to BlendSeconds of that stays one hold.
+                    var g = e + 1; while ( g < frames.Count && g - e <= blend && supported[g] && Lowest( g ) && !Resting( g, NearFloorCm ) ) g++;
+                    if ( g == e + 1 || g >= frames.Count || g - e > blend || !Resting( g, NearFloorCm ) ) break;
+                    e = g;
+                }
                 if ( e - f + 1 >= minimum )
                 {
                     // Held where it landed: a hand that touches down stays there. The capture's slide builds up while it rests
