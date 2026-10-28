@@ -887,7 +887,7 @@ public static class Retargeter
                 if(hovering>0)AddNote(report,$"Kept on the floor in {hovering} frames: brief hovering above it or sinking into it removed.");
                 var seatedFrames=Motion.CaptureSeat.Apply(frames,scene,map,target.Rig,target.UpAxis);
                 if(seatedFrames>0)AddNote(report,$"Seated on the floor in {seatedFrames} frames: hips lowered onto the floor, feet and resting hands held in place.");
-                var handsHeld=Motion.CaptureHandPlant.Apply(frames,target.Rig,target.UpAxis,solved.Fps);
+                var handsHeld=Motion.CaptureHandPlant.Apply(frames,target.Rig,target.UpAxis,solved.Fps,PlantedHands(scene,map,frames.Count));
                 if(handsHeld>0)AddNote(report,$"Hands on the floor held in place in {handsHeld} hand samples: palms resting on the floor no longer slide or hover.");
             }
         }
@@ -933,6 +933,16 @@ public static class Retargeter
         var looping = request.LoopingOverride ?? solved.Looping;
         return new Clip(clipName, solved.Fps, looping, frames);
     }
+
+    /// <summary>Frames where the capture marks each hand on the floor (stationary probability at least one half).</summary>
+    static Dictionary<BoneRole,bool[]> PlantedHands(SourceScene scene,MappingResult map,int count)
+        =>new[]{BoneRole.HandL,BoneRole.HandR}.ToDictionary(role=>role,role=>
+        {
+            var result=new bool[count];
+            if(map.RoleToBone.TryGetValue(role,out var bone)&&scene.CaptureStationaryJoints?.TryGetValue(scene.Skeleton[bone].Name,out var p)==true&&p.Length==count)
+                for(var f=0;f<count;f++)result[f]=p[f]>=.5f;
+            return result;
+        });
 
     /// <summary>Frames where the capture marks each joint planted (stationary probability at least one half): left ankle, left
     /// toe, right ankle, right toe.</summary>

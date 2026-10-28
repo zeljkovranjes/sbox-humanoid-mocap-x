@@ -31,7 +31,8 @@ public static class CaptureHandPlant
     /// <summary>Both feet this far off the floor leave the hands carrying the body. The breakin clip's one-handed spin
     /// holds its feet 0.8–2 m up while the captured support hand slid up to 32 cm a frame.</summary>
     public const float SupportFeetCm = 40;
-    /// <summary>Hands this close in height both carry the body, as in a headstand.</summary>
+    /// <summary>Hands this close in height both count as the lowest; a higher hand under a raised body carries weight
+    /// only while it rests still.</summary>
     public const float BothHandsCm = 2;
     static readonly BoneRole[][] Fingers =
     {
@@ -42,7 +43,9 @@ public static class CaptureHandPlant
     };
 
     /// <returns>The number of hand samples held.</returns>
-    public static int Apply( List<XForm[]> frames, TargetRig target, TargetUpAxis axis, float fps )
+    /// <param name="observed">Frames in which the video shows each hand on the floor under a raised body, by hand role;
+    /// such a hand is planted even where the capture lifted it.</param>
+    public static int Apply( List<XForm[]> frames, TargetRig target, TargetUpAxis axis, float fps, IReadOnlyDictionary<BoneRole, bool[]>? observed = null )
     {
         if ( frames.Count < 3 || fps <= 0 ) return 0;
         var rig = target.Skeleton; var up = axis == TargetUpAxis.YUpCm ? Vector3.UnitY : Vector3.UnitZ;
@@ -78,7 +81,10 @@ public static class CaptureHandPlant
         {
             var p = wrist[a.C]; var low = lowest[a.C];
             bool Lowest( int f ) => arms.All( other => low[f] <= lowest[other.C][f] + BothHandsCm * cm );
-            bool Resting( int f, float height ) => low[f] < height * cm && (supported[f] || f == 0 || Flat( p[f] - p[f - 1], up ).Length() < still);
+            bool Still( int f ) => f == 0 || Flat( p[f] - p[f - 1], up ).Length() < still;
+            // The lowest hand under a raised body rests however the capture drags it; any other hand must also be still,
+            // so the free hand swinging low through a one-handed spin is not planted.
+            bool Resting( int f, float height ) => low[f] < height * cm && (supported[f] && Lowest( f ) || Still( f ));
             for ( var f = 0; f < frames.Count; )
             {
                 if ( !Resting( f, NearFloorCm ) ) { f++; continue; }
@@ -88,8 +94,8 @@ public static class CaptureHandPlant
                     // Held where it landed: a hand that touches down stays there. The capture's slide builds up while it rests
                     // and is let go over BlendSeconds after the hand lifts, while it is moving anyway.
                     var length = e - f + 1; var anchor = Flat( p[f], up );
-                    // The hand carries the body only where it is the lower hand (or as low as the other): the capture also
-                    // lowered the free hand of the one-handed spin to within 13 cm of the floor.
+                    // The lower hand under a raised body carries it. A second hand that rests beside it is found below,
+                    // once the body has been carried: until then the whole body slides with the capture.
                     var bearing = Enumerable.Range( f, length ).Count( i => supported[i] && Lowest( i ) ) * 2 >= length;
                     if ( bearing || Enumerable.Range( f, length ).All( i => (Flat( p[i], up ) - anchor).Length() <= MaximumTravelCm * cm ) )
                     {
@@ -116,12 +122,18 @@ public static class CaptureHandPlant
             }
         }
         CarryBody( frames, rig, bearings, wrist, up, blend );
+        var seen = arms.ToDictionary( a => a.C, a => observed?.GetValueOrDefault( target.BoneForRole( BoneRole.HandL ) == a.C ? BoneRole.HandL : BoneRole.HandR ) is { } mask
+            && mask.Length == frames.Count ? mask : new bool[frames.Count] );
+        SecondHands( frames, rig, arms, parts, supported, seen, goals, bearings, up, cm, still, minimum, blend );
         Balance( frames, target, bearings, goals, up );
         var held = 0;
         for ( var f = 0; f < frames.Count; f++ )
         {
             var frame = frames[f];
-            foreach ( var a in arms )
+            // With both hands bearing weight, the second hand's small lean is followed by the first hand again, so neither
+            // ends off the floor.
+            var bothBearing = arms.Count( a => goals[a.C][f].Bearing && goals[a.C][f].Weight > 0 ) == arms.Length && arms.Length > 1;
+            foreach ( var a in bothBearing ? arms.Concat( arms.Take( 1 ) ) : arms )
             {
                 var (position, weight, bearing) = goals[a.C][f]; if ( weight <= 0 ) continue;
                 FkUtil.ToWorld( frame, rig, world );
@@ -160,8 +172,10 @@ public static class CaptureHandPlant
                     FkUtil.ToWorld( frame, rig, world );
                 }
                 Lean( rig[a.A].ParentIndex, MaximumShoulderDegrees );
-                // Still out of reach (pushing up off the hand), the body leans onto it from the base of the spine.
-                if ( target.BoneForRole( BoneRole.Spine0 ) is int spine ) Lean( spine, MaximumLeanDegrees );
+                // Still out of reach (pushing up off the hand), the body leans onto it from the base of the spine; only a third
+                // as far while the other hand also bears weight, since the body is fixed on that hand.
+                var otherBearing = arms.Any( o => o.C != a.C && goals[o.C][f].Bearing && goals[o.C][f].Weight > 0 );
+                if ( target.BoneForRole( BoneRole.Spine0 ) is int spine ) Lean( spine, otherBearing ? MaximumLeanDegrees / 3 : MaximumLeanDegrees );
                 var upper = world[a.A]; var middle = world[a.B]; var end = world[a.C];
                 var bend = Vector3.Cross( middle.Pos - upper.Pos, end.Pos - middle.Pos );
                 if ( bend.LengthSquared() < 1e-8f ) bend = Vector3.Transform( Vector3.UnitX, upper.Rot );
@@ -170,8 +184,8 @@ public static class CaptureHandPlant
                 FkUtil.ToWorld( frame, rig, world );
                 var parent = rig[a.C].ParentIndex;
                 frame[a.C].Rot = Quaternion.Normalize( (parent < 0 ? Quaternion.Identity : Quaternion.Inverse( world[parent].Rot )) * rotation );
-                held++;
             }
+            held += arms.Count( a => goals[a.C][f].Weight > 0 );
         }
         return held;
     }
@@ -198,6 +212,61 @@ public static class CaptureHandPlant
         var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
         for ( var f = 0; f < frames.Count; f++ )
             if ( shift[f] is { } move ) foreach ( var root in roots ) frames[f][root].Pos += move;
+    }
+
+    /// <summary>Plants a hand that bears weight beside the one carrying the body: where the video shows it on the floor
+    /// under a raised body, or where it rests still near the floor there. The breakin clip's closing headstand had both
+    /// hands down in the video but the capture's right hand 22–26 cm up. Stillness is judged after the body was carried
+    /// over the first hand, so the capture's slide does not hide it; the free hand sweeping low through a one-handed
+    /// spin is never still and stays free. The hand is let go over <paramref name="blend"/> frames.</summary>
+    static void SecondHands( List<XForm[]> frames, HumanoidMocapX.Core.Skeleton.Skeleton rig, (int A, int B, int C)[] arms, Dictionary<int, int[]> parts,
+        bool[] supported, Dictionary<int, bool[]> seen, Dictionary<int, (Vector3 Position, float Weight, bool Bearing)[]> goals,
+        List<(int Hand, int First, int Last, Vector3 Anchor)> bearings, Vector3 up, float cm, float still, int minimum, int blend )
+    {
+        var world = new XForm[rig.Count]; var hands = arms.Select( a => a.C ).ToArray();
+        var wrist = hands.ToDictionary( h => h, _ => new Vector3[frames.Count] ); var low = hands.ToDictionary( h => h, _ => new float[frames.Count] );
+        // Whether the floor under each wrist lies within the arm's reach of its shoulder.
+        var reachable = hands.ToDictionary( h => h, _ => new bool[frames.Count] );
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            FkUtil.ToWorld( frames[f], rig, world );
+            foreach ( var (a, b, h) in arms )
+            {
+                wrist[h][f] = world[h].Pos; low[h][f] = parts[h].Min( p => Vector3.Dot( world[p].Pos, up ) );
+                var floor = world[h].Pos - up * low[h][f];
+                reachable[h][f] = Vector3.Distance( world[a].Pos, floor ) <= 1.02f * (Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[h].Pos ));
+            }
+        }
+        foreach ( var h in hands )
+        {
+            var p = wrist[h];
+            bool Resting( int f, float height ) => !goals[h][f].Bearing && (seen[h][f]
+                || supported[f] && low[h][f] < height * cm && (f == 0 || Flat( p[f] - p[f - 1], up ).Length() < still));
+            for ( var f = 0; f < frames.Count; )
+            {
+                if ( !Resting( f, NearFloorCm ) ) { f++; continue; }
+                var e = f; while ( e + 1 < frames.Count && Resting( e + 1, LiftCm ) ) e++;
+                // A hand the video puts on the floor out of the arm's reach is a mismatch (SAM swaps hands upside down);
+                // reaching for it would only drag the body off the hand carrying it.
+                if ( e - f + 1 >= minimum && Enumerable.Range( f, e - f + 1 ).Count( i => reachable[h][i] ) * 2 >= e - f + 1 )
+                {
+                    var anchor = Flat( p[f], up ); var settle = Math.Max( 1, Math.Min( 3, (e - f) / 3 ) );
+                    for ( var i = f; i <= e; i++ )
+                    {
+                        var w = Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
+                        if ( w > goals[h][i].Weight || !goals[h][i].Bearing ) goals[h][i] = (anchor + up * (Vector3.Dot( p[i], up ) - low[h][i]), w, true);
+                    }
+                    bearings.Add( (h, f, e, anchor) );
+                    var carried = anchor + up * (Vector3.Dot( p[e], up ) - low[h][e]) - p[e];
+                    for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
+                    {
+                        var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
+                        if ( w > goals[h][i].Weight ) goals[h][i] = (p[i] + carried, w, false);
+                    }
+                }
+                f = e + 1;
+            }
+        }
     }
 
     /// <summary>Segment mass fractions (de Leva 1996) between joint pairs, for the body's centre of mass.</summary>

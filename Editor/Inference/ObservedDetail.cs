@@ -18,6 +18,8 @@ internal sealed record ObservedDetail(float[] Observations, float[] CameraRotati
         var fingers = FingerTransfer.Apply(document, Observations);
         var head = HeadPitch.Apply(document, Observations);
         var root = RootAnchor.Apply(document, Observations, CameraRotations, CameraTravel);
+        if (HandContact.Apply(document, Observations) is var planted && planted > 0)
+            document.Diagnostics.Add(FormattableString.Invariant($"Hands on the floor under a raised body, as SAM 3D Body sees them: {planted} hand frames marked for planting."));
         if (CaptureSpin.Apply(document) is var spun && spun > 0)
             document.Diagnostics.Add(FormattableString.Invariant($"Fast spins turn evenly: the body's heading was smoothed in {spun} frames."));
         document.Diagnostics.Add(FormattableString.Invariant($"Wrists and fingers follow SAM 3D Body's hand close-ups in {hands * 100:0}% and {fingers * 100:0}% of hand frames; head pitch follows its face keypoints, by up to {head:0}°."));
