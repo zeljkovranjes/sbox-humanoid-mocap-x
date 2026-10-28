@@ -7,6 +7,7 @@ MotionTests.Run();
 FingerTests.Run();
 FingerTransferTests.Run();
 HeadPitchTests.Run();
+RootAnchorTests.Run();
 CameraTests.Run();
 InferenceTests.Run();
 RefinerTests.Run();
