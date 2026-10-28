@@ -22,6 +22,10 @@ internal static class MotionPose
         }
     }
 
+    /// <summary>A bone's local rotation from world rotations filled by <see cref="World"/>.</summary>
+    internal static Quaternion Local(ReadOnlySpan<Quaternion> world, int bone, int parent)
+        => parent < 0 ? world[bone] : Quaternion.Normalize(Quaternion.Inverse(world[parent]) * world[bone]);
+
     /// <summary>The bone with <paramref name="role"/>, or -1.</summary>
     internal static int Bone(MotionDocument document, BoneRole role) => document.Bones.FindIndex(b => b.Role == role);
 

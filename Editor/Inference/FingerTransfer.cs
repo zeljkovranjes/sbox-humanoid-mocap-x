@@ -38,7 +38,7 @@ internal static class FingerTransfer
         BoneRole.PinkyProxR, BoneRole.PinkyMidR, BoneRole.PinkyDistR
     };
     // MHR70 hand order: per finger from thumb to pinky, tip, two middle joints, then the base; wrist last.
-    const int Wrist = 20, IndexBase = 7, MiddleBase = 11, PinkyBase = 19;
+    internal const int Wrist = 20, IndexBase = 7, MiddleBase = 11, PinkyBase = 19;
 
     /// <summary>Rewrites finger rotations of <paramref name="document"/>, whose frames match the
     /// per-frame <paramref name="observations"/> one to one. Returns the share of hand-frames that
@@ -93,8 +93,12 @@ internal static class FingerTransfer
                 directions[finger * 3 + segment] = Vector3.Normalize(direction);
             }
         for (var finger = 1; finger < 5; finger++) CoupleTip(directions.Slice(finger * 3, 3));
-        return Math.Clamp(Disagreement - ImageDistance(observation, left), 0, 1);
+        return Agreement(observation, left);
     }
+
+    /// <summary>How far to trust a hand pass, from 0 to 1: full trust while its image landmarks
+    /// stay within half a hand size of the body pass's, none from 1.5 hand sizes.</summary>
+    internal static double Agreement(ReadOnlySpan<float> observation, bool left) => Math.Clamp(Disagreement - ImageDistance(observation, left), 0, 1);
 
     /// <summary>Bends a finger's tip joint at least <see cref="TipCoupling"/> times as far as its
     /// middle joint, in the same plane. SAM's hand passes leave tips nearly straight (1–13° where
@@ -129,7 +133,7 @@ internal static class FingerTransfer
     static double Square(double value) => value * value;
 
     /// <summary>Palm axes as matrix rows: along the middle finger, across the palm, and its normal.</summary>
-    static bool Palm(Vector3 wrist, Vector3 index, Vector3 middle, Vector3 pinky, out Matrix4x4 palm)
+    internal static bool Palm(Vector3 wrist, Vector3 index, Vector3 middle, Vector3 pinky, out Matrix4x4 palm)
     {
         palm = Matrix4x4.Identity;
         var along = middle - wrist; var across = index - pinky;

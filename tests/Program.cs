@@ -5,6 +5,7 @@ BodyClearanceTests.Run();
 VideoLayoutTests.Run();
 MotionTests.Run();
 FingerTests.Run();
+HandTransferTests.Run();
 FingerTransferTests.Run();
 HeadPitchTests.Run();
 RootAnchorTests.Run();

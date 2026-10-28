@@ -31,7 +31,8 @@ static class ObservationFixture
                 (0, ears + Vector3.Transform(Face, rotation[head])),
                 (3, ears + Vector3.Transform(new Vector3(.07f, 0, 0), rotation[head])),
                 (4, ears - Vector3.Transform(new Vector3(.07f, 0, 0), rotation[head])),
-                (5, At("UpperArmL")), (6, At("UpperArmR")), (9, At("UpperLegL")), (10, At("UpperLegR"))
+                (5, At("UpperArmL")), (6, At("UpperArmR")), (7, At("LowerArmL")), (8, At("LowerArmR")), (9, At("UpperLegL")), (10, At("UpperLegR")),
+                (SamObservations.RightHandStart + 20, At("HandR")), (SamObservations.LeftHandStart + 20, At("HandL"))
             };
             foreach (var (index, world) in keypoints) Write(body, index, Camera3(world) - root);
             Write(observation, SamObservations.Translation / 3, root);
