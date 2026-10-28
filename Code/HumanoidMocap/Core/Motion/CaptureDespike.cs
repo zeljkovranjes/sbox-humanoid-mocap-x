@@ -131,8 +131,8 @@ public static class CaptureDespike
             }
         }
         // Joint turns that each follow a smooth path can still add up to a flick at the hand or foot (a dancer's foot
-        // doubled back 5 cm at the top of a swing): each limb's end is despiked in the world too, its limb reaching
-        // for the fitted place with the end's attitude kept.
+        // doubled back 5 cm at the top of a swing): each limb's end is despiked too, its limb reaching for the fitted place
+        // with the end's attitude kept.
         var path = new Vector3[frames.Count]; var changed = new bool[frames.Count];
         for ( var pass = 0; pass < Passes; pass++ )
             for ( var c = 0; c < chains.Length; c++ )
@@ -210,25 +210,36 @@ public static class CaptureDespike
             }
         }
         // The head and each finger's middle and last joint, by turning the bone above toward the fitted place; the joint
-        // keeps its attitude.
-        var aimed = new List<int>();
-        if ( target.BoneForRole( BoneRole.Head ) is int head ) aimed.Add( head );
-        foreach ( var finger in new[] { "Thumb", "Index", "Middle", "Ring", "Pinky" } )
-            foreach ( var side in new[] { "L", "R" } )
+        // keeps its attitude. Each path is followed in the frame of the bone that carries it (a finger in its hand's, the head
+        // in the chest's), so a hand spinning on the floor does not read as fingers flicking: fitted in the world, the arcs
+        // its fingertips swept at 30–40° a frame were pulled inward and tipped the flat fingers up to 8 cm off the floor.
+        var aimed = new List<(int Joint, int Frame)>();
+        if ( target.BoneForRole( BoneRole.Head ) is int head && rig[head].ParentIndex is var neck && neck >= 0 && rig[neck].ParentIndex >= 0 )
+            aimed.Add( (head, rig[neck].ParentIndex) );
+        foreach ( var side in new[] { "L", "R" } )
+        {
+            if ( target.BoneForRole( Enum.Parse<BoneRole>( "Hand" + side ) ) is not int hand ) continue;
+            foreach ( var finger in new[] { "Thumb", "Index", "Middle", "Ring", "Pinky" } )
                 foreach ( var joint in new[] { "Mid", "Dist" } )
-                    if ( Enum.TryParse<BoneRole>( finger + joint + side, out var role ) && target.BoneForRole( role ) is int bone ) aimed.Add( bone );
-        foreach ( var joint in aimed )
+                    if ( Enum.TryParse<BoneRole>( finger + joint + side, out var role ) && target.BoneForRole( role ) is int bone ) aimed.Add( (bone, hand) );
+        }
+        foreach ( var (joint, carrier) in aimed )
         {
             var above = rig[joint].ParentIndex; if ( above < 0 || rig[above].ParentIndex < 0 ) continue;
             for ( var pass = 0; pass < Passes; pass++ )
             {
-                for ( var f = 0; f < frames.Count; f++ ) { FkUtil.ToWorld( frames[f], rig, world ); path[f] = world[joint].Pos; }
+                for ( var f = 0; f < frames.Count; f++ )
+                {
+                    FkUtil.ToWorld( frames[f], rig, world );
+                    path[f] = Local( world[carrier], world[joint].Pos );
+                }
                 corrected += Positions( path, changed, 1 / unitsPerCm );
                 for ( var f = 0; f < frames.Count; f++ )
                 {
                     if ( !changed[f] ) continue;
                     FkUtil.ToWorld( frames[f], rig, world );
-                    var from = world[joint].Pos - world[above].Pos; var to = path[f] - world[above].Pos;
+                    var place = Global( world[carrier], path[f] );
+                    var from = world[joint].Pos - world[above].Pos; var to = place - world[above].Pos;
                     if ( from.LengthSquared() < 1e-10f || to.LengthSquared() < 1e-10f ) continue;
                     Turn( frames[f], rig, world, above, MathQ.FromTo( Vector3.Normalize( from ), Vector3.Normalize( to ) ), joint );
                 }
@@ -249,6 +260,9 @@ public static class CaptureDespike
         }
         return corrected;
     }
+
+    static Vector3 Local( XForm frame, Vector3 point ) => Vector3.Transform( point - frame.Pos, Quaternion.Inverse( frame.Rot ) );
+    static Vector3 Global( XForm frame, Vector3 point ) => frame.Pos + Vector3.Transform( point, frame.Rot );
 
     /// <summary>Turns <paramref name="bone"/> in the world by <paramref name="turn"/> about its own joint, keeping the
     /// world attitude of <paramref name="kept"/> below it.</summary>
