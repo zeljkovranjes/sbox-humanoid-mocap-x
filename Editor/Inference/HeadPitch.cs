@@ -7,21 +7,23 @@ namespace HumanoidMocapX.Inference;
 
 using Vector3 = System.Numerics.Vector3;
 
-/// <summary>Nods the head to the pitch SAM sees in the face. FlowHMR tilts the head 12–23°
-/// further down than SAM's nose and ear keypoints on both validation clips, which reads as a
-/// hunch. Pitch is measured against the trunk in the body's sagittal plane, so it holds for any
-/// body orientation; yaw and roll stay FlowHMR's. The neck and head share the correction.</summary>
+/// <summary>Nods the head to the pitch SAM sees in the face. FlowHMR tilts the head further
+/// down than SAM's nose and eye keypoints on both validation clips, which reads as a hunch.
+/// Pitch is measured against the trunk in the body's sagittal plane, so it holds for any body
+/// orientation; yaw and roll stay FlowHMR's. The neck and head share the correction.</summary>
 internal static class HeadPitch
 {
-    // In the SMPL template (zero pose, level head) the head's forward axis is 3.15° from the
-    // line from the ears' midpoint to the nose, using SMPL's COCO face vertices 583, 4071 and 332.
-    const float ForwardFromFace = 3.15f * MathF.PI / 180;
+    // In the SMPL template (zero pose, level head) the head's forward axis is 42.33° from the
+    // line from the eyes' midpoint to the nose, using SMPL's COCO face vertices 2800, 6260 and 332.
+    // Eyes and nose sit at the same landmarks in SMPL, MHR and MediaPipe; ears do not, and an
+    // ear-based line raised the five-second clip's head past what MediaPipe's face mesh shows.
+    const float ForwardFromFace = 42.33f * MathF.PI / 180;
     // Larger disagreements are keypoint failures, not posture; they fade out over Fade.
     const float MaxCorrection = 40 * MathF.PI / 180, Fade = 10 * MathF.PI / 180;
     // The face line and head axis must keep this much length off the lateral axis to be measured.
     const float MinSupport = .5f, FullSupport = .8f;
     const double Sigma = 3;
-    const int Nose = 0, LeftEar = 3, RightEar = 4, LeftShoulder = 5, RightShoulder = 6, LeftHip = 9, RightHip = 10;
+    const int Nose = 0, LeftEye = 1, RightEye = 2, LeftShoulder = 5, RightShoulder = 6, LeftHip = 9, RightHip = 10;
 
     /// <summary>Rotates the neck and head of each frame of <paramref name="document"/> toward
     /// the head pitch in the matching <paramref name="observations"/>. Returns the largest
@@ -41,7 +43,7 @@ internal static class HeadPitch
         {
             var k = observations.Slice(f * SamObservations.Elements, SamKeypoints.Count * 3);
             var observed = MotionPose.Angle(Mid(k, LeftShoulder, RightShoulder) - Mid(k, LeftHip, RightHip),
-                SamObservations.Point(k, Nose) - Mid(k, LeftEar, RightEar), SamObservations.Point(k, RightShoulder) - SamObservations.Point(k, LeftShoulder), out var faceSupport);
+                SamObservations.Point(k, Nose) - Mid(k, LeftEye, RightEye), SamObservations.Point(k, RightShoulder) - SamObservations.Point(k, LeftShoulder), out var faceSupport);
             MotionPose.World(document, document.Frames[f], world, position);
             lateral[f] = position[armR] - position[armL];
             var captured = MotionPose.Angle((position[armL] + position[armR] - position[legL] - position[legR]) / 2,

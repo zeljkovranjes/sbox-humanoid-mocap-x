@@ -10,8 +10,8 @@ static class ObservationFixture
 {
     internal static readonly Quaternion Camera = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI);
     static readonly Vector3 CameraPosition = new(0, 1, 5);
-    // The template's face line runs 3.15° below the head's forward axis.
-    static readonly Vector3 Face = new(0, -MathF.Sin(3.15f * MathF.PI / 180) * .1f, MathF.Cos(3.15f * MathF.PI / 180) * .1f);
+    // The template's eye-to-nose line runs 42.33° below the head's forward axis.
+    static readonly Vector3 Face = new(0, -MathF.Sin(42.33f * MathF.PI / 180) * .05f, MathF.Cos(42.33f * MathF.PI / 180) * .05f);
     static readonly string[] Fingers = { "Thumb", "Index", "Middle", "Ring", "Pinky" };
 
     internal static float[] Observe(MotionDocument motion)
@@ -23,14 +23,14 @@ static class ObservationFixture
             var position = Positions(motion, motion.Frames[f], out var rotation, out var beyond);
             Vector3 At(string role) => position[Bone(motion, role)];
             var head = Bone(motion, "Head");
-            var ears = position[head] + Vector3.Transform(new Vector3(0, .09f, 0), rotation[head]);
+            var eyes = position[head] + Vector3.Transform(new Vector3(0, .095f, .062f), rotation[head]);
             var root = Camera3(At("UpperLegL") + At("UpperLegR")) / 2 - new Vector3(0, -.9f, 0);
             var body = observation.Slice(SamObservations.BodyKeypoints, SamKeypoints.Count * 3);
             (int Index, Vector3 World)[] keypoints =
             {
-                (0, ears + Vector3.Transform(Face, rotation[head])),
-                (3, ears + Vector3.Transform(new Vector3(.07f, 0, 0), rotation[head])),
-                (4, ears - Vector3.Transform(new Vector3(.07f, 0, 0), rotation[head])),
+                (0, eyes + Vector3.Transform(Face, rotation[head])),
+                (1, eyes + Vector3.Transform(new Vector3(.033f, 0, 0), rotation[head])),
+                (2, eyes - Vector3.Transform(new Vector3(.033f, 0, 0), rotation[head])),
                 (5, At("UpperArmL")), (6, At("UpperArmR")), (7, At("LowerArmL")), (8, At("LowerArmR")), (9, At("UpperLegL")), (10, At("UpperLegR")),
                 (SamObservations.RightHandStart + 20, At("HandR")), (SamObservations.LeftHandStart + 20, At("HandL"))
             };
