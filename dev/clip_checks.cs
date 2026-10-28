@@ -41,7 +41,7 @@ public static class ClipChecks
         var (features, observations) = await processor.FeaturesAsync(frames, boxes, camera.Intrinsics, cancellation); times["Features"] = timer.Elapsed.TotalSeconds;
         await Save("features.json", features); await Save("observations.json", observations); await Save("timings.json", times); timer.Restart();
         var motion = await processor.GenerateAsync(features, camera.Rotations, frames.Count, cancellation); times["Generation"] = timer.Elapsed.TotalSeconds;
-        var exports = await Export(fixture, motion, directory, cancellation); await Save("timings.json", times);
+        var exports = await Export(fixture, motion, new ObservedDetail(observations, camera.Rotations), directory, cancellation); await Save("timings.json", times);
         var result = new { Passed = true, PredecodedFixture = true, Frames = frames.Count, Seconds = frames.Count / 30.0, StageSeconds = times, Exports = exports };
         await Save("result.json", result);
         return result;
@@ -57,15 +57,17 @@ public static class ClipChecks
         var features = JsonSerializer.Deserialize<float[]>(await File.ReadAllTextAsync(Path.Combine(directory, "features.json"), cancellation));
         var rotations = JsonSerializer.Deserialize<float[]>(await File.ReadAllTextAsync(Path.Combine(directory, "rotations.json"), cancellation));
         var motion = await Processor(fixture).GenerateAsync(features, rotations, fixture.Frames, cancellation);
-        return await Export(fixture, motion, directory, cancellation);
+        var observed = Path.Combine(directory, "observations.json");
+        var detail = File.Exists(observed) ? new ObservedDetail(JsonSerializer.Deserialize<float[]>(await File.ReadAllTextAsync(observed, cancellation)), rotations) : null;
+        return await Export(fixture, motion, detail, directory, cancellation);
     }
 
     static FlowVideoProcessor Processor(Fixture fixture) => new(new(fixture.FlowPath, fixture.SamPath, fixture.MhrPath, fixture.OmegaPath, fixture.DetectorPath, fixture.SmplPath),
         new() { CameraInterval = fixture.CameraInterval, Model = fixture.Model }, message => Log.Info(message));
 
-    static Task<object> Export(Fixture fixture, FlowMotion motion, string directory, CancellationToken cancellation) => Task.Run<object>(async () =>
+    static Task<object> Export(Fixture fixture, FlowMotion motion, ObservedDetail detail, string directory, CancellationToken cancellation) => Task.Run<object>(async () =>
     {
-        motion.Video = fixture.SourceVideo; motion.Name = Path.GetFileNameWithoutExtension(fixture.SourceVideo); var document = motion.ToDocument();
+        motion.Video = fixture.SourceVideo; motion.Name = Path.GetFileNameWithoutExtension(fixture.SourceVideo); var document = motion.ToDocument(); detail?.Apply(document);
         var bytes = Encoding.UTF8.GetBytes(document.ToJson()); await File.WriteAllBytesAsync(Path.Combine(directory, "capture.hmotion"), bytes, cancellation);
         await File.WriteAllTextAsync(Path.Combine(directory, "flow-motion.json"), JsonSerializer.Serialize(motion), cancellation);
         var results = new List<object>();

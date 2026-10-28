@@ -27,8 +27,9 @@ internal sealed class FlowVideoProcessor
     /// <summary>Reconstructs one person's motion from a 30 fps timeline, over the frames in
     /// which they are visible; the motion's start time is the first of those, in seconds from
     /// the timeline's start. Requires installed verified models and a live GPU. The caller owns
-    /// frames; all failures/cancellation propagate and no partial motion is returned.</summary>
-    internal async Task<(FlowMotion Motion, PersonSpan Person)> RunAsync(ICaptureFrames frames, CancellationToken cancellation)
+    /// frames; all failures/cancellation propagate and no partial motion is returned. Detail
+    /// refines the motion's document; see <see cref="ObservedDetail"/>.</summary>
+    internal async Task<(FlowMotion Motion, PersonSpan Person, ObservedDetail Detail)> RunAsync(ICaptureFrames frames, CancellationToken cancellation)
     {
         var person = await DetectAsync(frames, cancellation);
         var visible = person.Visible(frames);
@@ -36,7 +37,7 @@ internal sealed class FlowVideoProcessor
         var (features, observations) = await FeaturesAsync(visible, person.Boxes, camera.Intrinsics, cancellation);
         var motion = await GenerateAsync(features, camera.Rotations, visible.Count, cancellation);
         motion.StartTime = person.StartSeconds;
-        return (motion, person);
+        return (motion, person, new ObservedDetail(observations, camera.Rotations));
     }
 
     internal async Task<PersonSpan> DetectAsync(ICaptureFrames frames, CancellationToken cancellation)
