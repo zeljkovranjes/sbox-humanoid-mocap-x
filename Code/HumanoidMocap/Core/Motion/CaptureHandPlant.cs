@@ -158,6 +158,7 @@ public static class CaptureHandPlant
             && mask.Length == frames.Count ? mask : new bool[frames.Count] );
         SecondHands( frames, rig, arms, parts, supported, seen, goals, bearings, up, cm, still, minimum, blend );
         Balance( frames, target, bearings, goals, up, fps );
+        KeepArmBend( frames, target, arms, goals, supported, up, blend );
         var heading = arms.ToDictionary( a => a.C, a => chains[a.C] is { } chain
             ? Headings( frames, rig, a.C, chain, target.BoneForRole( BoneRole.HandL ) == a.C, goals[a.C], up ) : null );
         var held = 0; var lift = arms.ToDictionary( a => a.C, _ => 0f );
@@ -377,6 +378,79 @@ public static class CaptureHandPlant
                     }
                 }
                 f = e + 1;
+            }
+        }
+    }
+
+    /// <summary>Moves the body along each arm whose hand is held down, so the arm keeps the bend the capture gave it and
+    /// the body rides on it: the Citizen's arms are short for its body, so its straight support arm through the breakin
+    /// clip's spin folded to reach the floor, and crouching it fell 8 cm short of the floor where the dancer put a hand.
+    /// Feet on the floor are kept where they were by their legs; the move is smoothed over CarrySigmaFrames.</summary>
+    static void KeepArmBend( List<XForm[]> frames, TargetRig target, (int A, int B, int C)[] arms,
+        Dictionary<int, (Vector3 Position, float Weight, bool Bearing, bool Lifting)[]> goals, bool[] supported, Vector3 up, int blend )
+    {
+        var rig = target.Skeleton; var world = new XForm[rig.Count];
+        var move = new Vector3?[frames.Count];
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            FkUtil.ToWorld( frames[f], rig, world );
+            var sum = Vector3.Zero; var total = 0f;
+            foreach ( var (a, _, c) in arms )
+            {
+                var (position, weight, _, lifting) = goals[c][f];
+                if ( weight <= 0 || lifting ) continue;
+                var toShoulder = world[a].Pos - position; var length = toShoulder.Length(); if ( length < 1e-4f ) continue;
+                var natural = Vector3.Distance( world[a].Pos, world[c].Pos );
+                sum += toShoulder / length * (natural - length) * weight; total += weight;
+            }
+            if ( total > 0 ) move[f] = sum / total;
+        }
+        // Eased out over blend frames once the hands lift, as the carried body is: dropped at once, the body sprang back
+        // and a lifting Citizen's elbow snapped from straight to 123° in a frame.
+        for ( var f = 0; f + 1 < frames.Count; f++ )
+        {
+            if ( move[f] is not { } last || move[f + 1] is not null ) continue;
+            for ( var i = f + 1; i <= Math.Min( frames.Count - 1, f + blend ) && move[i] is null; i++ )
+            {
+                var w = 1 - (i - f) / (float)(blend + 1); w = w * w * (3 - 2 * w);
+                move[i] = last * w;
+            }
+            f += blend;
+        }
+        var smoothed = new Vector3[frames.Count]; var radius = (int)MathF.Ceiling( 3 * CarrySigmaFrames );
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            if ( move[f] is null ) continue;
+            // Symmetric and inside the held frames, as the carry: a hold starts and ends with the body where the capture put it.
+            var reach = 0;
+            while ( reach < radius && f - reach - 1 >= 0 && f + reach + 1 < frames.Count && move[f - reach - 1] is not null && move[f + reach + 1] is not null ) reach++;
+            var sum = Vector3.Zero; var total = 0f;
+            for ( var j = f - reach; j <= f + reach; j++ ) { var g = MathF.Exp( -.5f * (j - f) * (j - f) / (CarrySigmaFrames * CarrySigmaFrames) ); sum += move[j]!.Value * g; total += g; }
+            smoothed[f] = sum / total;
+        }
+        var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
+        var legs = new[] { (BoneRole.UpperLegL, BoneRole.LowerLegL, BoneRole.FootL), (BoneRole.UpperLegR, BoneRole.LowerLegR, BoneRole.FootR) }
+            .Select( l => target.BoneForRole( l.Item1 ) is int h && target.BoneForRole( l.Item2 ) is int k && target.BoneForRole( l.Item3 ) is int ft ? (H: h, K: k, F: ft) : ((int H, int K, int F)?)null )
+            .Where( l => l is not null ).Select( l => l!.Value ).ToArray();
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            if ( smoothed[f].LengthSquared() < 1e-10f ) continue;
+            FkUtil.ToWorld( frames[f], rig, world );
+            var feet = legs.Select( l => world[l.F] ).ToArray();
+            foreach ( var root in roots ) frames[f][root].Pos += smoothed[f];
+            if ( supported[f] ) continue;
+            // On its feet, the body moves on its legs: each foot stays where it was.
+            FkUtil.ToWorld( frames[f], rig, world );
+            for ( var i = 0; i < legs.Length; i++ )
+            {
+                var (h, k, ft) = legs[i];
+                var bend = Vector3.Cross( world[k].Pos - world[h].Pos, world[ft].Pos - world[k].Pos );
+                if ( bend.LengthSquared() < 1e-8f ) bend = Vector3.Transform( Vector3.UnitX, world[h].Rot );
+                var ik = TwoBoneIk.Solve( world[h].Pos, world[k].Pos, world[ft].Pos, feet[i].Pos, soften: 0, stableBendAxis: bend );
+                EffectorIk.ApplyWorldDeltas( frames[f], rig, h, k, ft, ik.UpperWorldDelta, ik.LowerWorldDelta, world );
+                FkUtil.ToWorld( frames[f], rig, world );
+                frames[f][ft].Rot = Quaternion.Normalize( Quaternion.Inverse( world[rig[ft].ParentIndex].Rot ) * feet[i].Rot );
+                FkUtil.ToWorld( frames[f], rig, world );
             }
         }
     }
