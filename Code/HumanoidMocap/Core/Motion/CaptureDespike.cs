@@ -72,24 +72,41 @@ public static class CaptureDespike
             for ( var c = 0; c < chains.Length; c++ ) held[c][f] = world[chains[c].C];
         }
         var still = StillCm * unitsPerCm;
-        var holding = chains.Select( _ => new float[frames.Count] ).ToArray();
-        for ( var c = 0; c < chains.Length; c++ )
-            for ( var f = 1; f + 1 < frames.Count; f++ )
-            {
-                if ( Vector3.Distance( held[c][f].Pos, held[c][f - 1].Pos ) >= still || Vector3.Distance( held[c][f + 1].Pos, held[c][f].Pos ) >= still ) continue;
-                for ( var j = Math.Max( 0, f - EaseFrames ); j <= Math.Min( frames.Count - 1, f + EaseFrames ); j++ )
-                {
-                    var w = 1 - Math.Abs( j - f ) / (float)(EaseFrames + 1); w = w * w * (3 - 2 * w);
-                    holding[c][j] = Math.Max( holding[c][j], w );
-                }
-            }
+        var holding = held.Select( track => Holding( track.Select( x => x.Pos ).ToArray(), still ) ).ToArray();
+        // Toes too: through toe-off the toe stays planted while the ankle lifts, so it is held on its own.
+        var toes = new[] { BoneRole.ToeL, BoneRole.ToeR }.Select( target.BoneForRole ).Where( b => b is int t && rig[t].ParentIndex >= 0 ).Select( b => b!.Value ).ToArray();
+        var toesHeld = toes.Select( _ => new Vector3[frames.Count] ).ToArray();
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            FkUtil.ToWorld( frames[f], rig, world );
+            for ( var t = 0; t < toes.Length; t++ ) toesHeld[t][f] = world[toes[t]].Pos;
+        }
+        var toesHolding = toesHeld.Select( track => Holding( track, still ) ).ToArray();
         // Three rounds: each world-space reach can leave a joint above it slightly off its path for the next round to take out.
         var corrected = 0;
-        for ( var round = 0; round < 3; round++ ) corrected += Settle( frames, target, unitsPerCm, chains, held, holding );
+        for ( var round = 0; round < 3; round++ ) corrected += Settle( frames, target, unitsPerCm, chains, held, holding, toes, toesHeld, toesHolding );
         return corrected;
     }
 
-    static int Settle( List<XForm[]> frames, TargetRig target, float unitsPerCm, (int A, int B, int C)[] chains, XForm[][] before, float[][] holding )
+    /// <summary>How firmly a joint following <paramref name="path"/> is held per frame: 1 where it moves less than
+    /// <paramref name="still"/> to either neighbour, easing out over EaseFrames on either side so a hold ends without a step.</summary>
+    static float[] Holding( Vector3[] path, float still )
+    {
+        var weight = new float[path.Length];
+        for ( var f = 1; f + 1 < path.Length; f++ )
+        {
+            if ( Vector3.Distance( path[f], path[f - 1] ) >= still || Vector3.Distance( path[f + 1], path[f] ) >= still ) continue;
+            for ( var j = Math.Max( 0, f - EaseFrames ); j <= Math.Min( path.Length - 1, f + EaseFrames ); j++ )
+            {
+                var w = 1 - Math.Abs( j - f ) / (float)(EaseFrames + 1); w = w * w * (3 - 2 * w);
+                weight[j] = Math.Max( weight[j], w );
+            }
+        }
+        return weight;
+    }
+
+    static int Settle( List<XForm[]> frames, TargetRig target, float unitsPerCm, (int A, int B, int C)[] chains, XForm[][] before, float[][] holding,
+        int[] toes, Vector3[][] toesHeld, float[][] toesHolding )
     {
         var rig = target.Skeleton; var world = new XForm[rig.Count];
         var corrected = Apply( frames, rig, unitsPerCm );
@@ -194,6 +211,19 @@ public static class CaptureDespike
                     if ( from.LengthSquared() < 1e-10f || to.LengthSquared() < 1e-10f ) continue;
                     Turn( frames[f], rig, world, above, MathQ.FromTo( Vector3.Normalize( from ), Vector3.Normalize( to ) ), joint );
                 }
+            }
+        }
+        // Held toes back where they were, by turning their foot about the ankle.
+        for ( var t = 0; t < toes.Length; t++ )
+        {
+            var foot = rig[toes[t]].ParentIndex;
+            for ( var f = 0; f < frames.Count; f++ )
+            {
+                var w = toesHolding[t][f]; if ( w <= 0 ) continue;
+                FkUtil.ToWorld( frames[f], rig, world );
+                var from = world[toes[t]].Pos - world[foot].Pos; var to = Vector3.Lerp( world[toes[t]].Pos, toesHeld[t][f], w ) - world[foot].Pos;
+                if ( from.LengthSquared() < 1e-10f || to.LengthSquared() < 1e-10f ) continue;
+                Turn( frames[f], rig, world, foot, MathQ.FromTo( Vector3.Normalize( from ), Vector3.Normalize( to ) ), toes[t] );
             }
         }
         return corrected;
