@@ -217,7 +217,8 @@ public static class CaptureHandPlant
                 var upper = world[a.A]; var middle = world[a.B]; var end = world[a.C];
                 var bend = Vector3.Cross( middle.Pos - upper.Pos, end.Pos - middle.Pos );
                 if ( bend.LengthSquared() < 1e-8f ) bend = Vector3.Transform( Vector3.UnitX, upper.Rot );
-                var ik = TwoBoneIk.Solve( upper.Pos, middle.Pos, end.Pos, goal, soften: 0, stableBendAxis: bend );
+                // A soft lock-out: near full stretch the elbow eases straight instead of snapping between bent and locked.
+                var ik = TwoBoneIk.Solve( upper.Pos, middle.Pos, end.Pos, goal, stableBendAxis: bend );
                 EffectorIk.ApplyWorldDeltas( frame, rig, a.A, a.B, a.C, ik.UpperWorldDelta, ik.LowerWorldDelta, world );
                 FkUtil.ToWorld( frame, rig, world );
                 var parent = rig[a.C].ParentIndex;
