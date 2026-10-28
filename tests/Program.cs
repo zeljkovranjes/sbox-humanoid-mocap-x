@@ -9,6 +9,8 @@ HandTransferTests.Run();
 FingerTransferTests.Run();
 HeadPitchTests.Run();
 RootAnchorTests.Run();
+CaptureSpinTests.Run();
+HandPlantTests.Run();
 CameraTests.Run();
 InferenceTests.Run();
 RefinerTests.Run();

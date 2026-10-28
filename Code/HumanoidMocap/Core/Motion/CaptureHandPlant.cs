@@ -18,13 +18,27 @@ using Vector3 = System.Numerics.Vector3;
 /// through that stretch it is held where it landed, palm on the floor, re-solved with two-bone arm IK; its
 /// orientation is kept. The slide the capture built up is let go over <see cref="BlendSeconds"/> after the hand lifts:
 /// held at the stretch's middle instead, a hand that slid while resting jumped to it at up to 2 m/s. A hand that travels more than <see cref="MaximumTravelCm"/> while low is wiping or
-/// sliding on purpose and is left alone.</summary>
+/// sliding on purpose and is left alone, unless both feet are at least <see cref="SupportFeetCm"/> off the floor: then the
+/// hand carries the body (handstands, freezes, one-handed spins) and cannot slide, however far the capture drifts. The body
+/// is moved to stay over such a hand, the palm turns flat onto the floor and the fingers straighten along it.</summary>
 public static class CaptureHandPlant
 {
     /// <summary>A hand comes to rest within NearFloorCm of the floor and stays at rest until it rises past LiftCm: the capture
     /// lifted a hand planted behind a seated dancer 9 cm as he got up, and a single threshold let it float.</summary>
     public const float MaximumShoulderDegrees = 25, MaximumLeanDegrees = 15;
     public const float NearFloorCm = 8, LiftCm = 15, StillMetresPerSecond = 1, MinimumSeconds = .15f, MaximumTravelCm = 25, BlendSeconds = .25f;
+    /// <summary>Both feet this far off the floor leave the hands carrying the body. The breakin clip's one-handed spin
+    /// holds its feet 0.8–2 m up while the captured support hand slid up to 32 cm a frame.</summary>
+    public const float SupportFeetCm = 40;
+    /// <summary>Hands this close in height both carry the body, as in a headstand.</summary>
+    public const float BothHandsCm = 2;
+    static readonly BoneRole[][] Fingers =
+    {
+        new[] { BoneRole.IndexProxL, BoneRole.IndexMidL, BoneRole.IndexDistL, BoneRole.MiddleProxL, BoneRole.MiddleMidL, BoneRole.MiddleDistL,
+            BoneRole.RingProxL, BoneRole.RingMidL, BoneRole.RingDistL, BoneRole.PinkyProxL, BoneRole.PinkyMidL, BoneRole.PinkyDistL },
+        new[] { BoneRole.IndexProxR, BoneRole.IndexMidR, BoneRole.IndexDistR, BoneRole.MiddleProxR, BoneRole.MiddleMidR, BoneRole.MiddleDistR,
+            BoneRole.RingProxR, BoneRole.RingMidR, BoneRole.RingDistR, BoneRole.PinkyProxR, BoneRole.PinkyMidR, BoneRole.PinkyDistR }
+    };
 
     /// <returns>The number of hand samples held.</returns>
     public static int Apply( List<XForm[]> frames, TargetRig target, TargetUpAxis axis, float fps )
@@ -39,20 +53,31 @@ public static class CaptureHandPlant
         var world = new XForm[rig.Count];
         // Each hand's wrist and the height of its lowest part, per frame, before anything is held.
         var parts = arms.ToDictionary( a => a.C, a => CaptureSeat.HandParts( target, a.C ) );
+        var feet = new[] { BoneRole.FootL, BoneRole.ToeL, BoneRole.FootR, BoneRole.ToeR }.Select( target.BoneForRole ).ToArray();
+        var supported = new bool[frames.Count];
+        // Finger chains (proximal, middle, distal for index to pinky) of each hand, where the rig has them all.
+        var chains = arms.ToDictionary( a => a.C, a => Fingers[target.BoneForRole( BoneRole.HandL ) == a.C ? 0 : 1].Select( target.BoneForRole ).ToArray() is var bones
+            && bones.All( b => b is int ) ? bones.Select( b => b!.Value ).ToArray() : null );
         var wrist = arms.ToDictionary( a => a.C, _ => new Vector3[frames.Count] );
         var lowest = arms.ToDictionary( a => a.C, _ => new float[frames.Count] );
         for ( var f = 0; f < frames.Count; f++ )
         {
             FkUtil.ToWorld( frames[f], rig, world );
             foreach ( var a in arms ) { wrist[a.C][f] = world[a.C].Pos; lowest[a.C][f] = parts[a.C].Min( b => Vector3.Dot( world[b].Pos, up ) ); }
+            if ( feet[0] is int footL && feet[2] is int footR )
+                supported[f] = Math.Min( Height( footL, feet[1] ), Height( footR, feet[3] ) ) > SupportFeetCm * cm;
         }
+        float Height( int foot, int? toe ) => Math.Min( Vector3.Dot( world[foot].Pos, up ), toe is int t ? Vector3.Dot( world[t].Pos, up ) : float.MaxValue );
         var minimum = Math.Max( 3, (int)MathF.Ceiling( MinimumSeconds * fps ) ); var blend = Math.Max( 1, (int)MathF.Round( BlendSeconds * fps ) );
         var still = StillMetresPerSecond * 100 * cm / fps;
-        var goals = arms.ToDictionary( a => a.C, _ => new (Vector3 Position, float Weight)[frames.Count] );
+        var goals = arms.ToDictionary( a => a.C, _ => new (Vector3 Position, float Weight, bool Bearing)[frames.Count] );
+        // Weight-bearing stretches (hand, first, last, landing point), to move the body over them below.
+        var bearings = new List<(int Hand, int First, int Last, Vector3 Anchor)>();
         foreach ( var a in arms )
         {
             var p = wrist[a.C]; var low = lowest[a.C];
-            bool Resting( int f, float height ) => low[f] < height * cm && (f == 0 || Flat( p[f] - p[f - 1], up ).Length() < still);
+            bool Lowest( int f ) => arms.All( other => low[f] <= lowest[other.C][f] + BothHandsCm * cm );
+            bool Resting( int f, float height ) => low[f] < height * cm && (supported[f] || f == 0 || Flat( p[f] - p[f - 1], up ).Length() < still);
             for ( var f = 0; f < frames.Count; )
             {
                 if ( !Resting( f, NearFloorCm ) ) { f++; continue; }
@@ -62,8 +87,12 @@ public static class CaptureHandPlant
                     // Held where it landed: a hand that touches down stays there. The capture's slide builds up while it rests
                     // and is let go over BlendSeconds after the hand lifts, while it is moving anyway.
                     var length = e - f + 1; var anchor = Flat( p[f], up );
-                    if ( Enumerable.Range( f, length ).All( i => (Flat( p[i], up ) - anchor).Length() <= MaximumTravelCm * cm ) )
+                    // The hand carries the body only where it is the lower hand (or as low as the other): the capture also
+                    // lowered the free hand of the one-handed spin to within 13 cm of the floor.
+                    var bearing = Enumerable.Range( f, length ).Count( i => supported[i] && Lowest( i ) ) * 2 >= length;
+                    if ( bearing || Enumerable.Range( f, length ).All( i => (Flat( p[i], up ) - anchor).Length() <= MaximumTravelCm * cm ) )
                     {
+                        if ( bearing ) bearings.Add( (a.C, f, e, anchor) );
                         // The palm settles onto the floor over a few frames rather than dropping in one.
                         var settle = Math.Max( 1, Math.Min( 3, (length - 1) / 3 ) );
                         for ( var i = f; i <= e; i++ )
@@ -71,29 +100,42 @@ public static class CaptureHandPlant
                             // Palm on the floor: the wrist at the held place, as high as puts the hand's lowest point on the floor.
                             var w = Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
                             var goal = anchor + up * (Vector3.Dot( p[i], up ) - low[i]);
-                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (goal, w);
+                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (goal, w, bearing);
                         }
                         // Everything held at the last frame, height included, is let go gradually.
                         var carried = anchor + up * (Vector3.Dot( p[e], up ) - low[e]) - p[e];
                         for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
                         {
                             var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (p[i] + carried, w);
+                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (p[i] + carried, w, false);
                         }
                     }
                 }
                 f = e + 1;
             }
         }
+        CarryBody( frames, rig, bearings, wrist, up, blend );
         var held = 0;
         for ( var f = 0; f < frames.Count; f++ )
         {
             var frame = frames[f];
             foreach ( var a in arms )
             {
-                var (position, weight) = goals[a.C][f]; if ( weight <= 0 ) continue;
+                var (position, weight, bearing) = goals[a.C][f]; if ( weight <= 0 ) continue;
                 FkUtil.ToWorld( frame, rig, world );
                 var rotation = world[a.C].Rot;
+                if ( bearing && chains[a.C] is { } chain )
+                {
+                    // A hand carrying the body lies flat: palm onto the floor, fingers straight along it, its lowest point on the floor.
+                    var down = Quaternion.Slerp( Quaternion.Identity, FromTo( PalmNormal( world, chain, a.C, target.BoneForRole( BoneRole.HandL ) == a.C ), -up ), weight );
+                    rotation = Quaternion.Normalize( down * rotation );
+                    Straighten( frame, chain, weight );
+                    var parent0 = rig[a.C].ParentIndex;
+                    frame[a.C].Rot = Quaternion.Normalize( (parent0 < 0 ? Quaternion.Identity : Quaternion.Inverse( world[parent0].Rot )) * rotation );
+                    FkUtil.ToWorld( frame, rig, world );
+                    var depth = parts[a.C].Min( b => Vector3.Dot( world[b].Pos - world[a.C].Pos, up ) );
+                    position = Flat( position, up ) + up * Math.Max( 0, -depth );
+                }
                 var goal = Vector3.Lerp( world[a.C].Pos, position, weight );
                 // Out of the straight arm's reach (a seated dancer rising off a planted hand), the shoulder drops
                 // toward the hand as a person's does: the clavicle turns, up to MaximumShoulderDegrees.
@@ -132,6 +174,63 @@ public static class CaptureHandPlant
         return held;
     }
     static Vector3 Flat( Vector3 v, Vector3 up ) => v - up * Vector3.Dot( v, up );
+
+    /// <summary>Moves the whole body so each weight-bearing hand stays where it landed, the way a support hand pins a
+    /// handstand; the move eases out over <paramref name="blend"/> frames after the hand lifts. Where both hands carry
+    /// the body, the one lower on average leads and the other is reached with the arm.</summary>
+    static void CarryBody( List<XForm[]> frames, HumanoidMocapX.Core.Skeleton.Skeleton rig, List<(int Hand, int First, int Last, Vector3 Anchor)> bearings,
+        Dictionary<int, Vector3[]> wrist, Vector3 up, int blend )
+    {
+        if ( bearings.Count == 0 ) return;
+        var shift = new Vector3?[frames.Count];
+        foreach ( var (hand, first, last, anchor) in bearings.OrderBy( s => Enumerable.Range( s.First, s.Last - s.First + 1 ).Average( i => Vector3.Dot( wrist[s.Hand][i], up ) ) ) )
+        {
+            for ( var i = first; i <= last; i++ ) shift[i] ??= anchor - Flat( wrist[hand][i], up );
+            var carried = shift[last]!.Value;
+            for ( var i = last + 1; i <= Math.Min( frames.Count - 1, last + blend ); i++ )
+            {
+                var w = 1 - (i - last) / (float)(blend + 1); w = w * w * (3 - 2 * w);
+                shift[i] ??= carried * w;
+            }
+        }
+        var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
+        for ( var f = 0; f < frames.Count; f++ )
+            if ( shift[f] is { } move ) foreach ( var root in roots ) frames[f][root].Pos += move;
+    }
+
+    /// <summary>The direction the palm faces, from the wrist and the index, middle and pinky knuckles. The back of a
+    /// right hand faces along (knuckle line × index-to-pinky); a left hand mirrors it.</summary>
+    static Vector3 PalmNormal( XForm[] world, int[] chain, int hand, bool left )
+    {
+        var along = world[chain[3]].Pos - world[hand].Pos; var across = world[chain[0]].Pos - world[chain[9]].Pos;
+        var normal = Vector3.Cross( along, across );
+        if ( normal.LengthSquared() < 1e-10f ) return Vector3.Zero;
+        normal = Vector3.Normalize( normal );
+        return left ? normal : -normal;
+    }
+
+    /// <summary>Turns each finger joint toward straight, by <paramref name="weight"/>: each segment continues the one
+    /// before, so a flat palm puts the fingers along the floor. Twist is kept.</summary>
+    static void Straighten( XForm[] frame, int[] chain, float weight )
+    {
+        for ( var finger = 0; finger < 4; finger++ )
+            for ( var segment = 0; segment < 3; segment++ )
+            {
+                var bone = chain[finger * 3 + segment];
+                // The parent's bone runs along this joint's offset; this bone runs along its child's (the tip along its own).
+                var inherited = frame[bone].Pos; var own = segment < 2 ? frame[chain[finger * 3 + segment + 1]].Pos : frame[bone].Pos;
+                if ( inherited.LengthSquared() < 1e-10f || own.LengthSquared() < 1e-10f ) continue;
+                var rotation = frame[bone].Rot;
+                var straight = Quaternion.Normalize( FromTo( Vector3.Normalize( Vector3.Transform( own, rotation ) ), Vector3.Normalize( inherited ) ) * rotation );
+                frame[bone].Rot = Quaternion.Normalize( Quaternion.Slerp( rotation, straight, weight ) );
+            }
+    }
+
+    static Quaternion FromTo( Vector3 from, Vector3 to )
+    {
+        if ( from.LengthSquared() < 1e-10f || to.LengthSquared() < 1e-10f ) return Quaternion.Identity;
+        return MathQ.FromTo( from, to );
+    }
     static bool IsWithin( HumanoidMocapX.Core.Skeleton.Skeleton rig, int bone, int ancestor )
     {
         for ( var b = bone; b >= 0; b = rig[b].ParentIndex ) if ( b == ancestor ) return true;
