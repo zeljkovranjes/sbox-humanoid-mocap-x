@@ -782,49 +782,54 @@ four lanes with `MOCAP_LANES=4`; see [the host guide](editor-host.md).
 
 SAM 3D Body's per-frame keypoints now refine FlowHMR's motion. Wrist turn and
 fingers follow the hand passes, head pitch follows the face keypoints, and, when
-the camera turns less than 2° over the clip, the root follows SAM's pelvis
-position.
-Both validation clips ran on an RTX 2080 Ti with the Linux worker. The
-measurements compare each capture before and after refinement against SAM's
-own observations:
+the camera neither turns more than 2° nor travels, the root follows SAM's pelvis
+position. Both validation clips ran on an RTX 2080 Ti with the Linux worker.
 
-| Clip | Root offset at the end | Largest lateral offset | Median head-pitch disagreement | Finger curl range |
+Each capture was projected through the clip's camera, fitted from the first
+second only so that later drift shows, and compared with evidence from models
+the refinement does not use. The root is compared with the YOLOX person box,
+and hands and face with MediaPipe's hand and face landmarks (verification only;
+MediaPipe is not part of the library). Hand error is the wrist-aligned distance
+of the 20 hand landmarks in hand sizes; nose height is measured relative to the
+eyes, in eye spans:
+
+| Clip | Root drift against the person box | Hand shape | Fingers | Nose height |
 | --- | ---: | ---: | ---: | ---: |
-| Breakin, 272 frames | 0.30 → 0.02 m | 0.36 → 0.14 m | 11.6° → 4.1° | 1.6° → 18.9° |
-| Five-second clip, 150 frames | 0.04 → 0.03 m | 0.04 → 0.02 m | 20.3° → 0.8° | 1.9° → 19.5° |
+| Breakin, 272 frames | 73.8 → 9.6 px | 0.328 → 0.302 | 0.334 → 0.305 | (helmet) |
+| Five-second clip, 150 frames | 12.4 → 6.3 px | 0.360 → 0.296 | 0.368 → 0.290 | 0.105 → 0.064 |
 
-Offsets are horizontal, in camera axes, relative to the first ten frames.
-Finger curl is the mean proximal-joint bend of the eight non-thumb fingers; the
-range runs from its 5th to 95th percentile over the clip. FlowHMR held nearly one
-hand pose throughout. The head-pitch constant (3.15° between the head's forward
-axis and the ear-to-nose line) comes from the SMPL template's COCO face vertices.
+MediaPipe found hands in 134 of 544 breakin hand-frames and 234 of 300 on the
+five-second clip, and a face in 124 of its 150 frames. It found no face under
+the breakin helmet. The remaining nose-height difference matches the one
+between SAM's own 2D face and MediaPipe's (0.052).
 
-The same captures, projected through the clip's camera, were also compared
-with the image itself. The camera is fitted from the first second only, so later
-drift shows. The root is compared with the YOLOX person box, which comes from a
-different model than SAM. Finger shape is compared with SAM's 2D hand
-keypoints, wrist-aligned and in hand sizes. Nose height relative to the ears is
-compared with SAM's 2D face keypoints, in ear spans:
+The head was first measured from the ears. The SMPL template's ear vertices put
+the head's forward axis 3.15° from the ear-to-nose line, but SAM's ear keypoints
+sit elsewhere on the ear, and the correction overshot. The ear-based head
+measured 0.125 against MediaPipe, worse than leaving FlowHMR's (0.105). Eyes
+and nose are the same landmarks in SMPL, MHR and MediaPipe; the template's
+forward axis lies 42.33° from its eye-to-nose line.
 
-| Clip | Root drift against the person box | Finger 2D error | Nose height error |
-| --- | ---: | ---: | ---: |
-| Breakin | 73.8 → 9.6 px | 1.12 → 0.79 | 0.141 → 0.066 |
-| Five-second clip | 12.4 → 6.3 px | 0.49 → 0.37 | 0.296 → 0.050 |
+FlowHMR's palms faced 55–89° away from SAM's (median per hand) while the
+forearms agreed within about 20°, so finger shapes alone did not help the
+breakin hands; each wrist is also turned to SAM's palm. SAM's hand passes leave
+fingertips nearly straight, 1–13° at the distal joint where the middle joint
+bends 22–38°. Fingertips are bent at least two thirds as far as their middle
+joints, the relaxed-hand coupling from Rijpkema and Girard (1991).
 
-Fingers alone did not lower the breakin finger error (1.12 → 1.15). FlowHMR's
-palms faced 55–89° away from SAM's (median per hand), while the forearms agreed
-within about 20°, so correct finger shapes landed on misoriented hands. Turning
-each wrist to SAM's palm brought it to 0.79. SAM's hand passes also leave
-fingertips nearly straight: 1–13° at the distal joint where the middle joint
-bends 22–38°. Fingertips are therefore bent at least two thirds as far as their
-middle joints, the relaxed-hand coupling from Rijpkema and Girard (1991).
+Hand passes are trusted in proportion to how well they agree with the body pass
+in the image. MediaPipe confirms the rule. Fully trusted hand passes lie 0.39
+(breakin) and 0.35 hand sizes from its landmarks, partly trusted ones 0.98 and
+1.38, and rejected ones over 2. On the breakin clip, whose gloved hands are
+about 35 pixels across, 58–63% of hand frames are used; on the five-second
+clip, 91%. Body-pass hand keypoints match MediaPipe more closely in 2D, but
+taking wrists and fingers from them was worse in the projected capture (0.366
+and 0.317 hand shape), so the hand passes stay the source.
 
 The breakin fixture's boxes, camera rotations, intrinsics, features and
 FlowHMR motion stay byte-identical to the run before this change; only
-`capture.hmotion` and both FBX exports differ. Hand-pass frames are used in
-proportion to how well each hand pass agrees with the body pass in the image:
-58–63% of hand frames on the breakin clip, whose gloved hands are about 35
-pixels across, and 91% on the five-second clip, where they are about 53. A
-single view cannot show how far fingers curl toward the camera, so curled idle
-hands can still read straighter than in the video. A camera that moves without
-turning is not detected, and its motion would be read as the person's.
+`capture.hmotion` and both FBX exports differ. VGGT's camera centres move 0.002
+(breakin) and 0.001 (five-second clip) of the scene's distance; anchoring stops
+above 0.05. No moving-camera clip was available to exercise that limit outside
+the unit tests. A single view cannot show how far fingers curl toward the
+camera, so curled idle hands can still read straighter than in the video.

@@ -10,13 +10,16 @@ using Vector3 = System.Numerics.Vector3;
 /// <summary>Holds the root where the video puts it. FlowHMR integrates its own root velocity,
 /// so a dancer who stays on one spot can wander off it (0.5 m over 9 s on the breakin clip).
 /// SAM places the pelvis in camera space in every frame independently, which does not drift.
-/// With a static camera, the capture's horizontal root path is pulled to SAM's, smoothed hard
-/// in depth because SAM's depth is far noisier than its image position. Height stays FlowHMR's,
-/// and so does the start position.</summary>
+/// With a camera that neither turns nor travels, the capture's horizontal root path is pulled to
+/// SAM's, smoothed hard in depth because SAM's depth is far noisier than its image position.
+/// Height stays FlowHMR's, and so does the start position.</summary>
 internal static class RootAnchor
 {
-    // A camera that turns further than this over the clip is not static.
+    // A camera that turns further than this over the clip, or whose centre moves further than
+    // this share of the scene's distance, is not static. Both tripod validation clips travel
+    // 0.001–0.002; 0.05 is about 30 cm at dancing distance, the size of the drift corrected.
     const double MaxCameraTurn = 2 * Math.PI / 180;
+    internal const float MaxCameraTravel = .05f;
     // Body directions that disagree by more than this after the camera fit are left out of it.
     const float FitResidual = 30 * MathF.PI / 180;
     // Smoothing in frames: across the image and in depth.
@@ -25,14 +28,16 @@ internal static class RootAnchor
 
     /// <summary>Moves each root of <paramref name="document"/> horizontally to follow SAM's
     /// pelvis in <paramref name="observations"/>. <paramref name="cameraRotations"/> holds one
-    /// row-major 3×3 camera rotation per frame. Returns the largest root shift in metres, or
-    /// null when the camera turns or the document lacks a root, shoulders or hips.</summary>
-    internal static double? Apply(MotionDocument document, ReadOnlySpan<float> observations, ReadOnlySpan<float> cameraRotations)
+    /// row-major 3×3 camera rotation per frame; <paramref name="cameraTravel"/> is
+    /// <see cref="FlowCamera.Travel"/>, NaN when unknown. Returns the largest root shift in
+    /// metres, or null when the camera turns, travels or may have, or the document lacks a root,
+    /// shoulders or hips.</summary>
+    internal static double? Apply(MotionDocument document, ReadOnlySpan<float> observations, ReadOnlySpan<float> cameraRotations, float cameraTravel)
     {
         var frames = document.Frames.Count;
         if (frames == 0 || observations.Length != frames * SamObservations.Elements || cameraRotations.Length != frames * 9)
             throw new ArgumentException("Root anchoring needs one SAM observation and camera rotation per motion frame.");
-        if (!IsStatic(cameraRotations)) return null;
+        if (!(cameraTravel <= MaxCameraTravel) || !IsStatic(cameraRotations)) return null;
         int armL = MotionPose.Bone(document, BoneRole.UpperArmL), armR = MotionPose.Bone(document, BoneRole.UpperArmR),
             legL = MotionPose.Bone(document, BoneRole.UpperLegL), legR = MotionPose.Bone(document, BoneRole.UpperLegR);
         if (Math.Min(Math.Min(armL, armR), Math.Min(legL, legR)) < 0 || document.Bones[0].Parent >= 0) return null;

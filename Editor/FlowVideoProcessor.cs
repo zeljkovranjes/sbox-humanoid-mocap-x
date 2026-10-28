@@ -37,7 +37,7 @@ internal sealed class FlowVideoProcessor
         var (features, observations) = await FeaturesAsync(visible, person.Boxes, camera.Intrinsics, cancellation);
         var motion = await GenerateAsync(features, camera.Rotations, visible.Count, cancellation);
         motion.StartTime = person.StartSeconds;
-        return (motion, person, new ObservedDetail(observations, camera.Rotations));
+        return (motion, person, new ObservedDetail(observations, camera.Rotations, camera.Travel));
     }
 
     internal async Task<PersonSpan> DetectAsync(ICaptureFrames frames, CancellationToken cancellation)
@@ -82,7 +82,7 @@ internal sealed class FlowVideoProcessor
         }
     }
 
-    internal async Task<(float[] Rotations, float[] Intrinsics)> CameraAsync(ICaptureFrames frames, CancellationToken cancellation)
+    internal async Task<(float[] Rotations, float[] Intrinsics, float Travel)> CameraAsync(ICaptureFrames frames, CancellationToken cancellation)
     {
         var pixels = Pixels(frames); var count = FlowCamera.SampleCount(frames.Count, cameraInterval);
         var reader = new CameraFrames(frames, pixels, cameraInterval, message => Report(message, 0.10));
@@ -97,7 +97,7 @@ internal sealed class FlowVideoProcessor
         var rotations = new float[frames.Count * 9]; var intrinsics = new float[rotations.Length];
         await Task.Run(() => FlowCamera.Decode(poses, frames.Count, cameraInterval, frames.Width, frames.Height, rotations, intrinsics, cancellation), cancellation);
         reportProgress?.Invoke("Camera reconstructed", 0.20);
-        return (rotations, intrinsics);
+        return (rotations, intrinsics, FlowCamera.Travel(poses));
     }
 
     /// <summary>FlowHMR's per-frame SAM features and, beside them, the frames' <see cref="SamObservations"/>.</summary>

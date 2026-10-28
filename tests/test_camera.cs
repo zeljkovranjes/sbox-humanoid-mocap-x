@@ -5,8 +5,8 @@ static class CameraTests
 {
     internal static void Run()
     {
-        Sampling(); Conversion(); ShortestTurn(); InvalidInputs(); Allocations();
-        Console.WriteLine("PASS: VGGT camera sampling, original-pixel intrinsics, shortest-arc interpolation, relative rotations and allocation-free decoding");
+        Sampling(); Conversion(); ShortestTurn(); InvalidInputs(); Allocations(); Travel();
+        Console.WriteLine("PASS: VGGT camera sampling, original-pixel intrinsics, shortest-arc interpolation, relative rotations, camera travel and allocation-free decoding");
     }
 
     static void Sampling()
@@ -126,6 +126,23 @@ static class CameraTests
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < 100; i++) FlowCamera.Decode(poses, 11, 10, 640, 480, rotations, intrinsics);
         MotionTests.Equal(0L, GC.GetAllocatedBytesForCurrentThread() - before);
+    }
+
+    static void Travel()
+    {
+        // A turning camera that stays put has no travel, whatever its rotation and translation.
+        var poses = new float[3 * 9];
+        Vector3[] centres = { new(1, 2, 3), new(1, 2, 3), new(1.3f, 2, 2.6f) };
+        for (var sample = 0; sample < 3; sample++)
+        {
+            var rotation = Quaternion.CreateFromAxisAngle(Vector3.Normalize(new Vector3(1, 2, 3)), sample * .4f);
+            Pose(poses.AsSpan(sample * 9, 9), rotation);
+            var translation = -Vector3.Transform(centres[sample], rotation);
+            poses[sample * 9] = translation.X; poses[sample * 9 + 1] = translation.Y; poses[sample * 9 + 2] = translation.Z;
+        }
+        MotionTests.Near(0, FlowCamera.Travel(poses.AsSpan(0, 18)), 1e-5);
+        MotionTests.Near(.5, FlowCamera.Travel(poses), 1e-5);
+        MotionTests.Throws<ArgumentException>(() => FlowCamera.Travel(poses.AsSpan(1)));
     }
 
     static void Pose(Span<float> pose, Quaternion rotation, int width = 640, int height = 480, float fx = 320, float fy = 240)
