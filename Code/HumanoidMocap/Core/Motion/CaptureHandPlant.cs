@@ -193,23 +193,7 @@ public static class CaptureHandPlant
                 // Out of the straight arm's reach (a seated dancer rising off a planted hand), the shoulder drops
                 // toward the hand as a person's does: the clavicle turns, up to MaximumShoulderDegrees.
                 var reach = Vector3.Distance( world[a.A].Pos, world[a.B].Pos ) + Vector3.Distance( world[a.B].Pos, world[a.C].Pos );
-                // Turns bone about its own joint, up to limit degrees, just far enough to bring the shoulder within reach.
-                void Lean( int bone, float limit )
-                {
-                    if ( bone < 0 || rig[bone].ParentIndex < 0 || Vector3.Distance( world[a.A].Pos, goal ) <= reach * .999f ) return;
-                    var pivot = world[bone].Pos; var from = world[a.A].Pos - pivot; var to = goal - pivot;
-                    var hinge = Vector3.Cross( from, to );
-                    if ( hinge.LengthSquared() < 1e-10f || from.LengthSquared() < 1e-8f ) return;
-                    hinge = Vector3.Normalize( hinge ); var turn = 0f;
-                    for ( var step = 1; step <= 25; step++ )
-                    {
-                        turn = step * limit / 25 * MathF.PI / 180;
-                        if ( Vector3.Distance( pivot + Vector3.Transform( from, Quaternion.CreateFromAxisAngle( hinge, turn ) ), goal ) <= reach * .999f ) break;
-                    }
-                    var turned = Quaternion.Normalize( Quaternion.CreateFromAxisAngle( hinge, turn ) * world[bone].Rot );
-                    frame[bone].Rot = Quaternion.Normalize( Quaternion.Inverse( world[rig[bone].ParentIndex].Rot ) * turned );
-                    FkUtil.ToWorld( frame, rig, world );
-                }
+                void Lean( int bone, float limit ) => CaptureHandPlant.Lean( frame, rig, world, bone, a.A, goal, reach, limit );
                 Lean( rig[a.A].ParentIndex, MaximumShoulderDegrees );
                 // Still out of reach (pushing up off the hand), the body leans onto it from the base of the spine; only a third
                 // as far while the other hand also bears weight, since the body is fixed on that hand.
@@ -229,6 +213,26 @@ public static class CaptureHandPlant
         return held;
     }
     static Vector3 Flat( Vector3 v, Vector3 up ) => v - up * Vector3.Dot( v, up );
+
+    /// <summary>Turns <paramref name="bone"/> about its own joint, up to <paramref name="limitDegrees"/>, just far enough
+    /// to bring <paramref name="shoulder"/> within <paramref name="reach"/> of <paramref name="goal"/>; no turn when it
+    /// already is or the bone is a root. Updates <paramref name="world"/>.</summary>
+    internal static void Lean( XForm[] frame, HumanoidMocapX.Core.Skeleton.Skeleton rig, XForm[] world, int bone, int shoulder, Vector3 goal, float reach, float limitDegrees )
+    {
+        if ( bone < 0 || rig[bone].ParentIndex < 0 || Vector3.Distance( world[shoulder].Pos, goal ) <= reach * .999f ) return;
+        var pivot = world[bone].Pos; var from = world[shoulder].Pos - pivot; var to = goal - pivot;
+        var hinge = Vector3.Cross( from, to );
+        if ( hinge.LengthSquared() < 1e-10f || from.LengthSquared() < 1e-8f ) return;
+        hinge = Vector3.Normalize( hinge ); var turn = 0f;
+        for ( var step = 1; step <= 25; step++ )
+        {
+            turn = step * limitDegrees / 25 * MathF.PI / 180;
+            if ( Vector3.Distance( pivot + Vector3.Transform( from, Quaternion.CreateFromAxisAngle( hinge, turn ) ), goal ) <= reach * .999f ) break;
+        }
+        var turned = Quaternion.Normalize( Quaternion.CreateFromAxisAngle( hinge, turn ) * world[bone].Rot );
+        frame[bone].Rot = Quaternion.Normalize( Quaternion.Inverse( world[rig[bone].ParentIndex].Rot ) * turned );
+        FkUtil.ToWorld( frame, rig, world );
+    }
 
     /// <summary>Moves the whole body so each weight-bearing hand stays where it landed, the way a support hand pins a
     /// handstand; the move eases out over <paramref name="blend"/> frames after the hand lifts. Where both hands carry
