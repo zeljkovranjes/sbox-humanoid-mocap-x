@@ -9,12 +9,14 @@ namespace HumanoidMocapX.EditorTools;
 
 /// <summary>Mocap adjustments › Processing › Account: who is signed in on the provider, what the
 /// account may do (whitelist, Discord server, priority, clip and upload limits), and signing out or
-/// switching accounts. On this computer it says no account is needed; before setup, how to start.
-/// The provider shares no email address, so none is shown.</summary>
+/// switching accounts. On a processing machine it shows the SSH address and worker; on this computer
+/// it says no account is needed; before setup, how to start. The provider shares no email address,
+/// so none is shown.</summary>
 sealed class AccountPage : Widget
 {
     const float LabelWidth = 150;
     readonly HostingSettings settings;
+    readonly SshSettings machine;
     readonly bool configured;
     readonly Action openSetup;
     readonly AccountAvatar avatar;
@@ -23,9 +25,9 @@ sealed class AccountPage : Widget
     readonly Widget facts;
     CancellationTokenSource pending;
 
-    internal AccountPage(Widget parent, HostingSettings settings, bool configured, Action openSetup) : base(parent)
+    internal AccountPage(Widget parent, HostingSettings settings, SshSettings machine, bool configured, Action openSetup) : base(parent)
     {
-        this.settings = settings; this.configured = configured; this.openSetup = openSetup;
+        this.settings = settings; this.machine = machine; this.configured = configured; this.openSetup = openSetup;
         Layout = Layout.Column(); Layout.Spacing = 12;
         // Identity: a plain row on the page's gray, like the facts below it.
         var identity = Layout.Add(new Widget(this) { Layout = Layout.Row(), FixedHeight = 44 });
@@ -53,6 +55,7 @@ sealed class AccountPage : Widget
         if (!this.IsValid()) return;
         pills.Clear(true); actions.Clear(true); facts.Layout.Clear(true);
         if (!configured) { ShowNotSetUp(); return; }
+        if (!settings.Enabled && machine.Enabled) { ShowMachine(); return; }
         if (!settings.Enabled) { ShowThisComputer(); return; }
         var profile = settings.SignedIn ? settings.Profile : null;
         var provider = ProcessingSetup.SavedProvider();
@@ -110,6 +113,16 @@ sealed class AccountPage : Widget
         avatar.ShowIcon("settings"); name.Text = "Not set up";
         handle.Text = "Choose whether videos are processed on this computer or by a provider.";
         actions.Add(Ui.Primary("Set up", "tune", openSetup));
+    }
+
+    void ShowMachine()
+    {
+        avatar.ShowIcon("dns"); name.Text = "Processing machine";
+        handle.Text = "No account needed: videos are copied to this machine over SSH and processed there.";
+        pills.Add(new Pill(this, "SSH", Ui.Accent));
+        var device = Group("Machine");
+        Fact(device, "Address", machine.Address);
+        Fact(device, "Worker", machine.Worker);
     }
 
     void ShowThisComputer()

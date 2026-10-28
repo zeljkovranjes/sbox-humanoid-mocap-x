@@ -6,16 +6,18 @@ using Sandbox;
 
 namespace HumanoidMocapX.EditorTools;
 
-/// <summary>The X window: an account bar across the top (provider account and queue, this computer,
-/// or a pointer to settings) above the shared workspace. Until a processing choice is saved the drop
-/// area is locked and the settings button shows a red dot; the choice is made in settings ›
-/// Processing › Setup, after which the window rebuilds and reopens that page.</summary>
+/// <summary>The X window: an account bar across the top (provider account and queue, the processing
+/// machine, this computer, or a pointer to settings) above the shared workspace. Until a processing
+/// choice is saved the drop area is locked and the settings button shows a red dot; the choice is made
+/// in settings › Processing › Setup, after which the window rebuilds and reopens that page.</summary>
 sealed class CaptureDialog : Dialog
 {
     const string SetupPage = "Setup";
     readonly CaptureOptions options;
     readonly HostingSettings hosting;
     readonly HostedCapture hosted;
+    readonly SshSettings machine;
+    readonly SshCapture remote;
     readonly LocalCapture local;
     readonly string models;
     QueueTracker queue;
@@ -34,6 +36,8 @@ sealed class CaptureDialog : Dialog
         var cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HumanoidMocapX");
         hosted = new HostedCapture(hosting, options, Path.Combine(cache, "hosted"));
         models = Path.Combine(cache, "models");
+        machine = ProcessingSetup.SavedMachine();
+        remote = new SshCapture(machine, options, Path.Combine(cache, "captures"));
         local = new LocalCapture(options, models, Path.Combine(cache, "captures"));
         Window.Title = MocapWindow.Title; Window.SetWindowIcon("videocam");
         Layout = Layout.Column();
@@ -50,12 +54,12 @@ sealed class CaptureDialog : Dialog
         if (hosting.Enabled)
             queue = new QueueTracker(hosting, hosted, path => workspace.IsValid() ? workspace.OpenMotionAsync(path) : Task.CompletedTask);
         var configured = ProcessingSetup.Configured;
-        Layout.Add(new AccountBar(this, hosting, queue, configured, OpenSetup));
-        capture = new FlowCapture(options, hosting, hosted, local);
+        Layout.Add(new AccountBar(this, hosting, machine, queue, configured, OpenSetup));
+        capture = new FlowCapture(options, hosting, hosted, machine, remote, local);
         workspace = Layout.Add(new RetargetWindow(this, MocapWindow.Title, capture,
-            host => MocapWindow.Settings(host, options, hosting, () => Later(Applied), RefreshGate)), 1);
+            host => MocapWindow.Settings(host, options, hosting, machine, () => Later(Applied), RefreshGate)), 1);
         var account = workspace.AddSettingsPage("Processing", "account_circle", "Account");
-        account.Layout.Add(new AccountPage(account, hosting, configured, OpenSetup));
+        account.Layout.Add(new AccountPage(account, hosting, machine, configured, OpenSetup));
         RefreshGate();
         Fit(new Vector2(760, 520), new Vector2(1040, 700));
         if (hosting.Enabled && hosting.SignedIn) _ = RefreshProfileAsync();
@@ -69,7 +73,7 @@ sealed class CaptureDialog : Dialog
     {
         if (!workspace.IsValid()) return;
         var reason = !ProcessingSetup.Configured ? ProcessingSetup.SetupMessage
-            : !hosting.Enabled && ModelStore.Missing(models, options.Model) is { } missing ? ProcessingSetup.ModelsMessage(missing) : null;
+            : !hosting.Enabled && !machine.Enabled && ModelStore.Missing(models, options.Model) is { } missing ? ProcessingSetup.ModelsMessage(missing) : null;
         capture.Blocked = reason;
         workspace.SetSetupRequired(reason);
     }

@@ -8,9 +8,9 @@ using Sandbox;
 namespace HumanoidMocapX.EditorTools;
 
 /// <summary>The strip across the top of the X window. With a provider: avatar, name, status pills,
-/// account ID and limits, then icon buttons for the queue, adding videos and sign-out. On this
-/// computer: the GPU. Before setup: a pointer to settings. Missing names and pictures show as not
-/// provided; account details and setup live in Mocap adjustments › Processing.</summary>
+/// account ID and limits, then icon buttons for the queue, adding videos and sign-out. On a processing
+/// machine: its SSH address. On this computer: the GPU. Before setup: a pointer to settings. Missing
+/// names and pictures show as not provided; account details and setup live in Mocap adjustments › Processing.</summary>
 sealed class AccountBar : Widget
 {
     readonly HostingSettings settings;
@@ -23,9 +23,9 @@ sealed class AccountBar : Widget
     readonly IconButton add, signOut;
     CancellationTokenSource pending;
 
-    /// <summary>Provider mode when <paramref name="queue"/> is set, otherwise this computer, or a
-    /// pointer to settings while processing is not <paramref name="configured"/>.</summary>
-    internal AccountBar(Widget parent, HostingSettings settings, QueueTracker queue, bool configured, Action openSetup) : base(parent)
+    /// <summary>Provider mode when <paramref name="queue"/> is set, otherwise the processing machine
+    /// or this computer, or a pointer to settings while processing is not <paramref name="configured"/>.</summary>
+    internal AccountBar(Widget parent, HostingSettings settings, SshSettings machine, QueueTracker queue, bool configured, Action openSetup) : base(parent)
     {
         this.settings = settings; this.queue = queue;
         Layout = Layout.Row(); Layout.Margin = new Sandbox.UI.Margin(12, 10, 12, 10); Layout.Spacing = 10;
@@ -42,6 +42,13 @@ sealed class AccountBar : Widget
             avatar.ShowIcon("settings");
             name.Text = "Not set up";
             details.Text = "Choose where videos are processed: settings (top right) › Processing › Setup.";
+            return;
+        }
+        if (queue is null && machine.Enabled)
+        {
+            avatar.ShowIcon("dns");
+            name.Text = "Processing machine";
+            details.Text = $"{machine.Address} over SSH · videos are copied there for processing";
             return;
         }
         if (queue is null)
