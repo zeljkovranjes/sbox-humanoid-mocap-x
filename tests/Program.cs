@@ -6,6 +6,7 @@ VideoLayoutTests.Run();
 MotionTests.Run();
 FingerTests.Run();
 HandTransferTests.Run();
+HandContactTests.Run();
 FingerTransferTests.Run();
 HeadPitchTests.Run();
 RootAnchorTests.Run();

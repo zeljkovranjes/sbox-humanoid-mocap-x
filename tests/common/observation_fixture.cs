@@ -32,6 +32,7 @@ static class ObservationFixture
                 (1, eyes + Vector3.Transform(new Vector3(.033f, 0, 0), rotation[head])),
                 (2, eyes - Vector3.Transform(new Vector3(.033f, 0, 0), rotation[head])),
                 (5, At("UpperArmL")), (6, At("UpperArmR")), (7, At("LowerArmL")), (8, At("LowerArmR")), (9, At("UpperLegL")), (10, At("UpperLegR")),
+                (13, At("FootL")), (14, At("FootR")),
                 (SamObservations.RightHandStart + 20, At("HandR")), (SamObservations.LeftHandStart + 20, At("HandL"))
             };
             foreach (var (index, world) in keypoints) Write(body, index, Camera3(world) - root);
