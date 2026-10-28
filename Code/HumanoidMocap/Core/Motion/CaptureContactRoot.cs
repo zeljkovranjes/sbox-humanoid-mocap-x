@@ -28,15 +28,27 @@ public static class CaptureContactRoot
     /// place: its feet glide, pivot and kick while the body stays put, so their slide is not the body drifting. The
     /// correction fades out below InPlaceFullCm and is off entirely below InPlaceCm.</summary>
     public const float InPlaceCm = 15, InPlaceFullCm = 30;
-    /// <summary>Per frame, whether the capture's contact tracks put some foot on the floor; null without tracks.</summary>
-    public static bool[] ContactMask( int count, SourceScene source, MappingResult mapping )
+    /// <summary>Per frame, whether the capture's contact tracks put some foot on the floor under the body (the hips
+    /// <see cref="UprightFraction"/> of their standing height above it); null without tracks. A breakdancer's feet
+    /// held still in the air through a headstand were marked planted 140 cm up, and the floor followed them.</summary>
+    public static bool[] ContactMask( List<XForm[]> frames, SourceScene source, MappingResult mapping, TargetRig target, TargetUpAxis axis )
     {
         if ( source.CaptureStationaryJoints is not { Count: > 0 } tracks ) return null;
+        var count = frames.Count;
         var feet = new[] { BoneRole.FootL, BoneRole.ToeL, BoneRole.FootR, BoneRole.ToeR }
-            .Select( r => mapping.RoleToBone.TryGetValue( r, out var b ) && tracks.TryGetValue( source.Skeleton[b].Name, out var p ) && p.Length == count ? p : null )
-            .Where( p => p is not null ).ToArray();
+            .Select( r => (Track: mapping.RoleToBone.TryGetValue( r, out var b ) && tracks.TryGetValue( source.Skeleton[b].Name, out var p ) && p.Length == count ? p : null, Joint: target.BoneForRole( r )) )
+            .Where( t => t.Track is not null && t.Joint is not null ).ToArray();
         if ( feet.Length == 0 ) return null;
-        return Enumerable.Range( 0, count ).Select( f => feet.Any( p => p[f] >= .5f ) ).ToArray();
+        var rig = target.Skeleton; var up = axis == TargetUpAxis.YUpCm ? Vector3.UnitY : Vector3.UnitZ;
+        var hips = target.BoneForRole( BoneRole.Hips ); var standing = hips is int h0 ? Vector3.Dot( rig.RestWorld[h0].Pos, up ) : 0f;
+        var mask = new bool[count]; var world = new XForm[rig.Count];
+        for ( var f = 0; f < count; f++ )
+        {
+            if ( !feet.Any( t => t.Track[f] >= .5f ) ) continue;
+            FkUtil.ToWorld( frames[f], rig, world );
+            mask[f] = feet.Any( t => t.Track[f] >= .5f && (hips is not int h || Vector3.Dot( world[h].Pos - world[t.Joint.Value].Pos, up ) >= UprightFraction * standing) );
+        }
+        return mask;
     }
     static float Median( IEnumerable<float> values ) { var sorted = values.OrderBy( v => v ).ToArray(); return sorted[sorted.Length / 2]; }
     /// <returns>The largest horizontal correction, in centimetres.</returns>
