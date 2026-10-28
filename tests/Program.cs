@@ -50,3 +50,4 @@ await InstalledTests.Run();
 await DownloadTests.Run();
 await HostedTests.Run();
 await FlowCaptureTests.Run();
+await SshCaptureTests.Run();
