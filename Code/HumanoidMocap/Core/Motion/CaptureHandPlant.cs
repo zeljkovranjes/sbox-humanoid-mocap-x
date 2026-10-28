@@ -202,6 +202,9 @@ public static class CaptureHandPlant
                 // as far while the other hand also bears weight, since the body is fixed on that hand.
                 var otherBearing = arms.Any( o => o.C != a.C && goals[o.C][f].Bearing && goals[o.C][f].Weight > 0 );
                 if ( target.BoneForRole( BoneRole.Spine0 ) is int spine ) Lean( spine, otherBearing ? MaximumLeanDegrees / 3 : MaximumLeanDegrees );
+                // Still out of reach, a hand that is down comes straight up off its spot as the body rises, rather than being
+                // dragged across the floor by the straightened arm.
+                if ( !lifting ) goal = Above( goal, world[a.A].Pos, reach * .999f, up );
                 var upper = world[a.A]; var middle = world[a.B]; var end = world[a.C];
                 var bend = Vector3.Cross( middle.Pos - upper.Pos, end.Pos - middle.Pos );
                 if ( bend.LengthSquared() < 1e-8f ) bend = Vector3.Transform( Vector3.UnitX, upper.Rot );
@@ -216,6 +219,15 @@ public static class CaptureHandPlant
         return held;
     }
     static Vector3 Flat( Vector3 v, Vector3 up ) => v - up * Vector3.Dot( v, up );
+
+    /// <summary>The lowest point straight above <paramref name="goal"/> within <paramref name="reach"/> of
+    /// <paramref name="shoulder"/>; <paramref name="goal"/> itself when it is within reach or nothing above it is.</summary>
+    static Vector3 Above( Vector3 goal, Vector3 shoulder, float reach, Vector3 up )
+    {
+        var d = shoulder - goal; var along = Vector3.Dot( d, up ); var room = along * along - d.LengthSquared() + reach * reach;
+        if ( d.LengthSquared() <= reach * reach || room < 0 ) return goal;
+        return goal + up * (along - MathF.Sqrt( room ));
+    }
 
     /// <summary>Turns <paramref name="bone"/> about its own joint, up to <paramref name="limitDegrees"/>, just far enough
     /// to bring <paramref name="shoulder"/> within <paramref name="reach"/> of <paramref name="goal"/>; no turn when it
@@ -312,7 +324,6 @@ public static class CaptureHandPlant
         var wrist = hands.ToDictionary( h => h, _ => new Vector3[frames.Count] ); var low = hands.ToDictionary( h => h, _ => new float[frames.Count] );
         // Whether the floor under each wrist lies within the arm's reach of its shoulder.
         var reachable = hands.ToDictionary( h => h, _ => new bool[frames.Count] );
-        var shoulder = hands.ToDictionary( h => h, _ => new Vector3[frames.Count] ); var reach = hands.ToDictionary( h => h, _ => new float[frames.Count] );
         for ( var f = 0; f < frames.Count; f++ )
         {
             FkUtil.ToWorld( frames[f], rig, world );
@@ -320,8 +331,7 @@ public static class CaptureHandPlant
             {
                 wrist[h][f] = world[h].Pos; low[h][f] = parts[h].Min( p => Vector3.Dot( world[p].Pos, up ) );
                 var floor = world[h].Pos - up * low[h][f];
-                shoulder[h][f] = world[a].Pos; reach[h][f] = 1.02f * (Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[h].Pos ));
-                reachable[h][f] = Vector3.Distance( world[a].Pos, floor ) <= reach[h][f];
+                reachable[h][f] = Vector3.Distance( world[a].Pos, floor ) <= 1.02f * (Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[h].Pos ));
             }
         }
         foreach ( var h in hands )
@@ -348,12 +358,6 @@ public static class CaptureHandPlant
                     for ( var i = f; i <= last; i++ )
                     {
                         var goal = anchor + up * (Vector3.Dot( p[i], up ) - low[h][i]);
-                        // Carried on only while the place stays within the arm's reach; as the body rises off it the hand lifts.
-                        if ( i > e && Vector3.Distance( shoulder[h][i], goal ) > reach[h][i] )
-                        {
-                            for ( var j = i; j <= Math.Min( frames.Count - 1, last + blend ); j++ ) goals[h][j] = default;
-                            last = i - 1; break;
-                        }
                         var w = before >= 0 ? 1 : Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
                         goals[h][i] = (goal, w, true, false);
                     }
