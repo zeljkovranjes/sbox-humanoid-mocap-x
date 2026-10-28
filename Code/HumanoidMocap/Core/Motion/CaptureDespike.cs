@@ -104,9 +104,6 @@ public static class CaptureDespike
                 FkUtil.ToWorld( frames[f], rig, world );
                 var goal = Vector3.Lerp( world[e].Pos, before[c][f].Pos, w );
                 var attitude = Quaternion.Normalize( Quaternion.Slerp( world[e].Rot, before[c][f].Rot, w ) );
-                // A limb the cleanup held at full stretch (leaning the shoulder in) may have lost its reach to the smoothing.
-                CaptureHandPlant.Lean( frames[f], rig, world, rig[a].ParentIndex, a, goal,
-                    Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[e].Pos ), CaptureHandPlant.MaximumShoulderDegrees );
                 var bend = Vector3.Cross( world[b].Pos - world[a].Pos, world[e].Pos - world[b].Pos );
                 if ( bend.LengthSquared() < 1e-8f ) bend = Vector3.Transform( Vector3.UnitX, world[a].Rot );
                 var ik = TwoBoneIk.Solve( world[a].Pos, world[b].Pos, world[e].Pos, goal, soften: 0, stableBendAxis: bend );
