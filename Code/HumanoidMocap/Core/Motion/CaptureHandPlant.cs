@@ -245,6 +245,7 @@ public static class CaptureHandPlant
         var wrist = hands.ToDictionary( h => h, _ => new Vector3[frames.Count] ); var low = hands.ToDictionary( h => h, _ => new float[frames.Count] );
         // Whether the floor under each wrist lies within the arm's reach of its shoulder.
         var reachable = hands.ToDictionary( h => h, _ => new bool[frames.Count] );
+        var shoulder = hands.ToDictionary( h => h, _ => new Vector3[frames.Count] ); var reach = hands.ToDictionary( h => h, _ => new float[frames.Count] );
         for ( var f = 0; f < frames.Count; f++ )
         {
             FkUtil.ToWorld( frames[f], rig, world );
@@ -252,7 +253,8 @@ public static class CaptureHandPlant
             {
                 wrist[h][f] = world[h].Pos; low[h][f] = parts[h].Min( p => Vector3.Dot( world[p].Pos, up ) );
                 var floor = world[h].Pos - up * low[h][f];
-                reachable[h][f] = Vector3.Distance( world[a].Pos, floor ) <= 1.02f * (Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[h].Pos ));
+                shoulder[h][f] = world[a].Pos; reach[h][f] = 1.02f * (Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[h].Pos ));
+                reachable[h][f] = Vector3.Distance( world[a].Pos, floor ) <= reach[h][f];
             }
         }
         foreach ( var h in hands )
@@ -268,18 +270,33 @@ public static class CaptureHandPlant
                 // reaching for it would only drag the body off the hand carrying it.
                 if ( e - f + 1 >= minimum && Enumerable.Range( f, e - f + 1 ).Count( i => reachable[h][i] ) * 2 >= e - f + 1 )
                 {
-                    var anchor = Flat( p[f], up ); var settle = Math.Max( 1, Math.Min( 3, (e - f) / 3 ) );
-                    for ( var i = f; i <= e; i++ )
+                    // A hand that never leaves the floor is one touch: it keeps the place of a hold ending just before, and a hold
+                    // starting just after carries on at this one's. The breakin clip's right hand, held through the closing freeze,
+                    // jumped 66 cm to where the first pass had put it as the dancer pushed up.
+                    var before = bearings.FindIndex( s => s.Hand == h && s.Last == f - 1 );
+                    var anchor = before >= 0 ? bearings[before].Anchor : Flat( p[f], up ); var settle = Math.Max( 1, Math.Min( 3, (e - f) / 3 ) );
+                    var after = bearings.FindIndex( s => s.Hand == h && s.First == e + 1 );
+                    var last = after >= 0 ? bearings[after].Last : e;
+                    if ( after >= 0 ) bearings.RemoveAt( after );
+                    for ( var i = f; i <= last; i++ )
                     {
-                        var w = Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
-                        if ( w > goals[h][i].Weight || !goals[h][i].Bearing ) goals[h][i] = (anchor + up * (Vector3.Dot( p[i], up ) - low[h][i]), w, true);
+                        var goal = anchor + up * (Vector3.Dot( p[i], up ) - low[h][i]);
+                        // Carried on only while the place stays within the arm's reach; as the body rises off it the hand lifts.
+                        if ( i > e && Vector3.Distance( shoulder[h][i], goal ) > reach[h][i] )
+                        {
+                            for ( var j = i; j <= Math.Min( frames.Count - 1, last + blend ); j++ ) goals[h][j] = default;
+                            last = i - 1; break;
+                        }
+                        var w = before >= 0 ? 1 : Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
+                        goals[h][i] = (goal, w, true);
                     }
+                    e = last;
                     bearings.Add( (h, f, e, anchor) );
                     var carried = anchor + up * (Vector3.Dot( p[e], up ) - low[h][e]) - p[e];
                     for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
                     {
                         var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                        if ( w > goals[h][i].Weight ) goals[h][i] = (p[i] + carried, w, true);
+                        if ( w >= goals[h][i].Weight ) goals[h][i] = (p[i] + carried, w, true);
                     }
                 }
                 f = e + 1;
