@@ -80,7 +80,7 @@ public static class CaptureHandPlant
         float Height( int foot, int? toe ) => Math.Min( Vector3.Dot( world[foot].Pos, up ), toe is int t ? Vector3.Dot( world[t].Pos, up ) : float.MaxValue );
         var minimum = Math.Max( 3, (int)MathF.Ceiling( MinimumSeconds * fps ) ); var blend = Math.Max( 1, (int)MathF.Round( BlendSeconds * fps ) );
         var still = StillMetresPerSecond * 100 * cm / fps;
-        var goals = arms.ToDictionary( a => a.C, _ => new (Vector3 Position, float Weight, bool Bearing)[frames.Count] );
+        var goals = arms.ToDictionary( a => a.C, _ => new (Vector3 Position, float Weight, bool Bearing, bool Lifting)[frames.Count] );
         // Weight-bearing stretches (hand, first, last, landing point), to move the body over them below.
         var bearings = new List<(int Hand, int First, int Last, Vector3 Anchor)>();
         foreach ( var a in arms )
@@ -125,7 +125,7 @@ public static class CaptureHandPlant
                             // Palm on the floor: the wrist at the held place, as high as puts the hand's lowest point on the floor.
                             var w = Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
                             var goal = anchor + up * (Vector3.Dot( p[i], up ) - low[i]);
-                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (goal, w, bearing);
+                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (goal, w, bearing, false);
                         }
                         // Everything held at the last frame, height included, is let go gradually; a flat palm curls back
                         // over the same frames instead of snapping.
@@ -133,7 +133,7 @@ public static class CaptureHandPlant
                         for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
                         {
                             var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (p[i] + carried, w, bearing);
+                            if ( w > goals[a.C][i].Weight ) goals[a.C][i] = (p[i] + carried, w, bearing, true);
                         }
                     }
                 }
@@ -147,7 +147,7 @@ public static class CaptureHandPlant
         Balance( frames, target, bearings, goals, up, fps );
         var heading = arms.ToDictionary( a => a.C, a => chains[a.C] is { } chain
             ? Headings( frames, rig, a.C, chain, target.BoneForRole( BoneRole.HandL ) == a.C, goals[a.C], up ) : null );
-        var held = 0;
+        var held = 0; var lift = arms.ToDictionary( a => a.C, _ => 0f );
         for ( var f = 0; f < frames.Count; f++ )
         {
             var frame = frames[f];
@@ -156,7 +156,7 @@ public static class CaptureHandPlant
             var bothBearing = arms.Count( a => goals[a.C][f].Bearing && goals[a.C][f].Weight > 0 ) == arms.Length && arms.Length > 1;
             foreach ( var a in bothBearing ? arms.Concat( arms.Take( 1 ) ) : arms )
             {
-                var (position, weight, bearing) = goals[a.C][f]; if ( weight <= 0 ) continue;
+                var (position, weight, bearing, lifting) = goals[a.C][f]; if ( weight <= 0 ) continue;
                 FkUtil.ToWorld( frame, rig, world );
                 var rotation = world[a.C].Rot;
                 if ( bearing && chains[a.C] is { } chain )
@@ -174,7 +174,10 @@ public static class CaptureHandPlant
                     frame[a.C].Rot = Quaternion.Normalize( (parent0 < 0 ? Quaternion.Identity : Quaternion.Inverse( world[parent0].Rot )) * rotation );
                     FkUtil.ToWorld( frame, rig, world );
                     var depth = parts[a.C].Min( b => Vector3.Dot( world[b].Pos - world[a.C].Pos, up ) );
-                    position = Flat( position, up ) + up * Math.Max( 0, -depth );
+                    // Down, the flat hand's lowest point is on the floor. Lifting, the hand rises as the capture lifts it from
+                    // where it was held, never through the floor: forced down, a Citizen's lifting arm overreached and flipped.
+                    if ( !lifting ) { lift[a.C] = Math.Max( 0, -depth ) - Vector3.Dot( position, up ); position = Flat( position, up ) + up * Math.Max( 0, -depth ); }
+                    else position = Flat( position, up ) + up * Math.Max( Math.Max( 0, -depth ), Vector3.Dot( position, up ) + lift[a.C] );
                 }
                 var goal = Vector3.Lerp( world[a.C].Pos, position, weight );
                 // Out of the straight arm's reach (a seated dancer rising off a planted hand), the shoulder drops
@@ -263,7 +266,7 @@ public static class CaptureHandPlant
     /// over the first hand, so the capture's slide does not hide it; the free hand sweeping low through a one-handed
     /// spin is never still and stays free. The hand is let go over <paramref name="blend"/> frames.</summary>
     static void SecondHands( List<XForm[]> frames, HumanoidMocapX.Core.Skeleton.Skeleton rig, (int A, int B, int C)[] arms, Dictionary<int, int[]> parts,
-        bool[] supported, Dictionary<int, bool[]> seen, Dictionary<int, (Vector3 Position, float Weight, bool Bearing)[]> goals,
+        bool[] supported, Dictionary<int, bool[]> seen, Dictionary<int, (Vector3 Position, float Weight, bool Bearing, bool Lifting)[]> goals,
         List<(int Hand, int First, int Last, Vector3 Anchor)> bearings, Vector3 up, float cm, float still, int minimum, int blend )
     {
         var world = new XForm[rig.Count]; var hands = arms.Select( a => a.C ).ToArray();
@@ -313,7 +316,7 @@ public static class CaptureHandPlant
                             last = i - 1; break;
                         }
                         var w = before >= 0 ? 1 : Math.Clamp( (i - f + 1) / (float)(settle + 1), 0, 1 ); w = w * w * (3 - 2 * w);
-                        goals[h][i] = (goal, w, true);
+                        goals[h][i] = (goal, w, true, false);
                     }
                     e = last;
                     bearings.Add( (h, f, e, anchor) );
@@ -321,7 +324,7 @@ public static class CaptureHandPlant
                     for ( var i = e + 1; i <= Math.Min( frames.Count - 1, e + blend ); i++ )
                     {
                         var w = 1 - (i - e) / (float)(blend + 1); w = w * w * (3 - 2 * w);
-                        if ( w >= goals[h][i].Weight ) goals[h][i] = (p[i] + carried, w, true);
+                        if ( w >= goals[h][i].Weight ) goals[h][i] = (p[i] + carried, w, true, true);
                     }
                 }
                 f = e + 1;
@@ -354,7 +357,7 @@ public static class CaptureHandPlant
     /// in the capture where SAM saw 5°, which swung the free hand on a circle a quarter wider. Two hands or a hand and
     /// the head down share the weight, and the body is left as captured.</summary>
     static void Balance( List<XForm[]> frames, TargetRig target, List<(int Hand, int First, int Last, Vector3 Anchor)> bearings,
-        Dictionary<int, (Vector3 Position, float Weight, bool Bearing)[]> goals, Vector3 up, float fps )
+        Dictionary<int, (Vector3 Position, float Weight, bool Bearing, bool Lifting)[]> goals, Vector3 up, float fps )
     {
         var rig = target.Skeleton; var segments = Segments.Select( s => (A: target.BoneForRole( s.From ), B: target.BoneForRole( s.To ), s.Mass) ).ToArray();
         if ( bearings.Count == 0 || segments.Any( s => s.A is null || s.B is null ) ) return;
@@ -433,7 +436,7 @@ public static class CaptureHandPlant
     /// support hand turned with the body, 30° a frame, which smoothing keeps; in the closing freeze the capture wobbled it
     /// 33° over three frames and back, which it removes.</summary>
     static double[] Headings( List<XForm[]> frames, HumanoidMocapX.Core.Skeleton.Skeleton rig, int hand, int[] chain, bool left,
-        (Vector3 Position, float Weight, bool Bearing)[] goals, Vector3 up )
+        (Vector3 Position, float Weight, bool Bearing, bool Lifting)[] goals, Vector3 up )
     {
         var raw = new double[frames.Count]; Array.Fill( raw, double.NaN ); var world = new XForm[rig.Count];
         for ( var f = 0; f < frames.Count; f++ )
