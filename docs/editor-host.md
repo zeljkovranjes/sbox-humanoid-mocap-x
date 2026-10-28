@@ -14,9 +14,8 @@ signed account requests to this loopback listener. See the [provider guide],
 
 ## Requirements
 
-- A running s&box editor with the library and its tensor-inference dependency
-  installed. Windows decodes uploads with Media Foundation; Linux needs FFmpeg
-  (`ffmpeg` and `ffprobe` on `PATH`).
+- A running s&box editor with the library installed. Windows decodes uploads
+  with Media Foundation; Linux needs FFmpeg (`ffmpeg` and `ffprobe` on `PATH`).
 - A GPU with a reported memory budget. Kernels use s&box graphics APIs on AMD
   and NVIDIA; native NVIDIA acceptance remains to be performed.
 - Both FlowHMR releases and all perception/rig weights installed through

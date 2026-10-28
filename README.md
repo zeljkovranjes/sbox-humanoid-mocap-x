@@ -15,12 +15,12 @@ processing and local C#/HLSL FlowHMR inference.
 
 [`MocapWindow`]: Editor/MocapWindow.cs
 
-Download the latest [release] and put both libraries in your project's
-`Libraries` folder. Humanoid Mocap does not need to be installed.
+Download the latest [release] and put it in your project's `Libraries`
+folder. Humanoid Mocap and Tensor Inference are built in and do not need to be
+installed.
 
 ```text
 Libraries/humanoid-mocap-x/     this repository
-Libraries/tensor-inference/     tensor-inference-<version>.zip from the release
 ```
 
 [release]: https://github.com/zeljkovranjes/sbox-humanoid-mocap-x/releases/latest
