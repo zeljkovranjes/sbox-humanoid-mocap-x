@@ -73,7 +73,7 @@ public static class FbxAnimationWriter
             var model = N("Model", ids[b], bone.Name + "\0\u0001Model", "LimbNode");
             model.Children.AddRange(new[] { N("Version", 232), Node("Properties70",
                 V("Lcl Translation", rest.Pos), V("Lcl Rotation", rotation), V("Lcl Scaling", Vector3.One),
-                P("RotationActive", "bool", true), P("RotationOrder", "enum", 0), P("InheritType", "enum", 1)) });
+                P("RotationActive", "bool", 1), P("RotationOrder", "enum", 0), P("InheritType", "enum", 1)) });
             objects.Children.Add(model); Connect(ids[b], bone.ParentIndex < 0 ? 0 : ids[bone.ParentIndex]);
             long attributeId = Id();
             var attribute = N("NodeAttribute", attributeId, bone.Name + "\0\u0001NodeAttribute", "LimbNode");
@@ -152,6 +152,9 @@ public static class FbxAnimationWriter
     static float Unwrap(float value, float previous) => value + 360 * MathF.Round((previous - value) / 360);
     static FbxNode N(string name, params object[] properties) { var node = new FbxNode(name); node.Properties.AddRange(properties); return node; }
     static FbxNode Node(string name, params FbxNode[] children) { var node = N(name); node.Children.AddRange(children); return node; }
-    static FbxNode P(string name, string type, params object[] values) => N("P", new object[] { name, type, "", "A" }.Concat(values).ToArray());
+    // Label and flags as the FBX SDK writes them. Blender refuses the file over any other spelling.
+    static FbxNode P(string name, string type, params object[] values) => N("P", new object[] { name, type,
+        type switch { "double" => "Number", "int" => "Integer", "KTime" => "Time", _ => "" },
+        type is "Number" or "Lcl Translation" or "Lcl Rotation" or "Lcl Scaling" ? "A" : "" }.Concat(values).ToArray());
     static FbxNode V(string name, Vector3 v) => P(name, name, (double)v.X, (double)v.Y, (double)v.Z);
 }

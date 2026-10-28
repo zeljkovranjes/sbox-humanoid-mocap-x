@@ -210,12 +210,11 @@ public static class CaptureDespike
             }
         }
         // The head and each finger's middle and last joint, by turning the bone above toward the fitted place; the joint
-        // keeps its attitude. Each path is followed in the frame of the bone that carries it (a finger in its hand's, the head
-        // in the chest's), so a hand spinning on the floor does not read as fingers flicking: fitted in the world, the arcs
-        // its fingertips swept at 30–40° a frame were pulled inward and tipped the flat fingers up to 8 cm off the floor.
+        // keeps its attitude. A finger's path is followed in its hand's frame, so a hand spinning on the floor does not read as
+        // fingers flicking: fitted in the world, the arcs its fingertips swept at 30–40° a frame were pulled inward and tipped
+        // the flat fingers up to 8 cm off the floor. The head's is followed in the world (-1), where it wobbles.
         var aimed = new List<(int Joint, int Frame)>();
-        if ( target.BoneForRole( BoneRole.Head ) is int head && rig[head].ParentIndex is var neck && neck >= 0 && rig[neck].ParentIndex >= 0 )
-            aimed.Add( (head, rig[neck].ParentIndex) );
+        if ( target.BoneForRole( BoneRole.Head ) is int head ) aimed.Add( (head, -1) );
         foreach ( var side in new[] { "L", "R" } )
         {
             if ( target.BoneForRole( Enum.Parse<BoneRole>( "Hand" + side ) ) is not int hand ) continue;
@@ -231,14 +230,14 @@ public static class CaptureDespike
                 for ( var f = 0; f < frames.Count; f++ )
                 {
                     FkUtil.ToWorld( frames[f], rig, world );
-                    path[f] = Local( world[carrier], world[joint].Pos );
+                    path[f] = carrier < 0 ? world[joint].Pos : Local( world[carrier], world[joint].Pos );
                 }
                 corrected += Positions( path, changed, 1 / unitsPerCm );
                 for ( var f = 0; f < frames.Count; f++ )
                 {
                     if ( !changed[f] ) continue;
                     FkUtil.ToWorld( frames[f], rig, world );
-                    var place = Global( world[carrier], path[f] );
+                    var place = carrier < 0 ? path[f] : Global( world[carrier], path[f] );
                     var from = world[joint].Pos - world[above].Pos; var to = place - world[above].Pos;
                     if ( from.LengthSquared() < 1e-10f || to.LengthSquared() < 1e-10f ) continue;
                     Turn( frames[f], rig, world, above, MathQ.FromTo( Vector3.Normalize( from ), Vector3.Normalize( to ) ), joint );

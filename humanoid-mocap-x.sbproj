@@ -21,7 +21,9 @@
       ],
       "ReleaseMode": "Release"
     },
-    "Summary": "Third-person FlowHMR motion capture for s&box with Humanoid Mocap retargeting built in.",
+    "Summary": "The successor to Humanoid Mocap: turns a video of a person into body, hand and finger animation for s&box.",
+    "Description": "Humanoid Mocap X is the successor to Humanoid Mocap. It reconstructs body, hand and finger motion from a video with FlowHMR and SAM 3D Body, and retargets it onto the s&box Human, the Citizen or a custom humanoid model. Captures can run inside the editor on your own GPU or on another Linux machine over SSH. Planted hands and feet stay on the floor, the motion is cleaned of snaps, and the result exports as FBX for ModelDoc. Windows and Linux.",
+    "WebsiteUrl": "https://github.com/zeljkovranjes/sbox-humanoid-mocap-x",
     "Tags": [
       "animation",
       "motion-capture",

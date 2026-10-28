@@ -93,6 +93,7 @@ static class MotionTests
         var times = Enumerable.Range(0, clip.SolvedFrames.Count).Select(i => i / (double)clip.Fps).ToArray();
         var bytes = ModelDocFbxExport.Write(target.Rig.Skeleton, "capture", clip.SolvedFrames, times,
             clip.Fps, target.UpAxis, "WorldRelative");
+        BlenderReadable(FbxTokenizer.Parse(bytes));
         var parsed = FbxImporter.Import(bytes);
         Near(2.54, parsed.UnitScaleCm);
         var hips = target.Rig.BoneForRole(BoneRole.Hips)!.Value;
@@ -102,6 +103,19 @@ static class MotionTests
         var expected = clip.SolvedFrames[0][hips].Pos;
         if (target.UpAxis == TargetUpAxis.ZUpEngine) expected *= 2.54f;
         Near(0, NumericVector3.Distance(expected, parsed.Clips[0].Frames[0][importedHips].Pos), .003);
+    }
+
+    // Blender's importer asserts these property spellings and refuses the whole file otherwise.
+    static void BlenderReadable(FbxNode node)
+    {
+        foreach (var child in node.Children) BlenderReadable(child);
+        if (node.Name != "P") return;
+        var (name, type, label, flags) = ((string)node.Properties[0], (string)node.Properties[1], (string)node.Properties[2], (string)node.Properties[3]);
+        var expected = type switch { "double" => "Number", "int" => "Integer", _ => "" };
+        if (type is "double" or "int" or "enum" or "bool" or "Number")
+            Check(label == expected, $"FBX property {name} ({type}) is labelled '{label}', not '{expected}'");
+        if (type is "enum" or "bool")
+            Check(flags == "" && node.Properties[4] is int, $"FBX property {name} ({type}) has flags '{flags}' or a non-int value");
     }
 
     static void FootContacts()
