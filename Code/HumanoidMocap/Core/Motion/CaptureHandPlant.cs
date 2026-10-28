@@ -209,9 +209,26 @@ public static class CaptureHandPlant
                 shift[i] ??= carried * w;
             }
         }
+        // Smoothed over time: the capture's frame-to-frame jitter at the hand would otherwise shake the whole body. The window
+        // stays symmetric and inside the carried frames, shrinking toward their ends, so the body is not moved before the hand
+        // lands (a hand landing on a 3 cm-a-frame slide settled 5 cm sideways) and a steady slide is followed exactly. The
+        // arm's IK below keeps the hand itself exactly where it landed.
+        var smoothed = new Vector3[frames.Count]; var radius = (int)MathF.Ceiling( 3 * CarrySigmaFrames );
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            if ( shift[f] is null ) continue;
+            var reach = 0;
+            while ( reach < radius && f - reach - 1 >= 0 && f + reach + 1 < frames.Count && shift[f - reach - 1] is not null && shift[f + reach + 1] is not null ) reach++;
+            var sum = Vector3.Zero; var total = 0f;
+            for ( var j = f - reach; j <= f + reach; j++ )
+            {
+                var g = MathF.Exp( -.5f * (j - f) * (j - f) / (CarrySigmaFrames * CarrySigmaFrames) ); sum += shift[j]!.Value * g; total += g;
+            }
+            smoothed[f] = sum / total;
+        }
         var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
         for ( var f = 0; f < frames.Count; f++ )
-            if ( shift[f] is { } move ) foreach ( var root in roots ) frames[f][root].Pos += move;
+            if ( smoothed[f].LengthSquared() > 0 ) foreach ( var root in roots ) frames[f][root].Pos += smoothed[f];
     }
 
     /// <summary>Plants a hand that bears weight beside the one carrying the body: where the video shows it on the floor
@@ -282,6 +299,8 @@ public static class CaptureHandPlant
     /// that hand at least BalanceMinimumSeconds (a windmill's brief touches are not held long enough to tip the body
     /// over), and the tilt is smoothed over BalanceSigmaFrames so it eases in and out.</summary>
     public const float MaximumBalanceDegrees = 30, BalanceMinimumSeconds = .4f, BalanceSigmaFrames = 4;
+    /// <summary>The body's move over a carrying hand is smoothed over this many frames.</summary>
+    public const float CarrySigmaFrames = 3;
 
     /// <summary>Tilts a body that rests on a single hand about that wrist until its centre of mass is over it: on one
     /// hand it cannot be anywhere else without falling. The breakin clip's one-handed spin leaned 14° off the hand
