@@ -125,7 +125,7 @@ public static class CaptureHandPlant
         var seen = arms.ToDictionary( a => a.C, a => observed?.GetValueOrDefault( target.BoneForRole( BoneRole.HandL ) == a.C ? BoneRole.HandL : BoneRole.HandR ) is { } mask
             && mask.Length == frames.Count ? mask : new bool[frames.Count] );
         SecondHands( frames, rig, arms, parts, supported, seen, goals, bearings, up, cm, still, minimum, blend );
-        Balance( frames, target, bearings, goals, up );
+        Balance( frames, target, bearings, goals, up, fps );
         var held = 0;
         for ( var f = 0; f < frames.Count; f++ )
         {
@@ -278,35 +278,53 @@ public static class CaptureHandPlant
         (BoneRole.UpperLegL, BoneRole.LowerLegL, .14f), (BoneRole.UpperLegR, BoneRole.LowerLegR, .14f),
         (BoneRole.LowerLegL, BoneRole.FootL, .06f), (BoneRole.LowerLegR, BoneRole.FootR, .06f)
     };
-    /// <summary>A body on one hand is tilted at most this far to bring its weight over the hand.</summary>
-    public const float MaximumBalanceDegrees = 30;
+    /// <summary>A body on one hand is tilted at most this far to bring its weight over the hand, only where it stays on
+    /// that hand at least BalanceMinimumSeconds (a windmill's brief touches are not held long enough to tip the body
+    /// over), and the tilt is smoothed over BalanceSigmaFrames so it eases in and out.</summary>
+    public const float MaximumBalanceDegrees = 30, BalanceMinimumSeconds = .4f, BalanceSigmaFrames = 4;
 
     /// <summary>Tilts a body that rests on a single hand about that wrist until its centre of mass is over it: on one
     /// hand it cannot be anywhere else without falling. The breakin clip's one-handed spin leaned 14° off the hand
     /// in the capture where SAM saw 5°, which swung the free hand on a circle a quarter wider. Two hands or a hand and
     /// the head down share the weight, and the body is left as captured.</summary>
     static void Balance( List<XForm[]> frames, TargetRig target, List<(int Hand, int First, int Last, Vector3 Anchor)> bearings,
-        Dictionary<int, (Vector3 Position, float Weight, bool Bearing)[]> goals, Vector3 up )
+        Dictionary<int, (Vector3 Position, float Weight, bool Bearing)[]> goals, Vector3 up, float fps )
     {
         var rig = target.Skeleton; var segments = Segments.Select( s => (A: target.BoneForRole( s.From ), B: target.BoneForRole( s.To ), s.Mass) ).ToArray();
         if ( bearings.Count == 0 || segments.Any( s => s.A is null || s.B is null ) ) return;
         var roots = Enumerable.Range( 0, rig.Count ).Where( b => rig[b].ParentIndex < 0 ).ToArray();
-        var world = new XForm[rig.Count];
+        var world = new XForm[rig.Count]; var minimum = (int)MathF.Ceiling( BalanceMinimumSeconds * fps );
+        // The tilt each frame needs, as an axis times an angle, and the hand it turns about; zero where none is needed.
+        var needed = new Vector3[frames.Count]; var pivotHand = new int[frames.Count]; Array.Fill( pivotHand, -1 );
         for ( var f = 0; f < frames.Count; f++ )
         {
             var on = bearings.Where( s => s.First <= f && f <= s.Last ).ToArray();
-            if ( on.Length != 1 ) continue;
-            var hand = on[0].Hand; var weight = goals[hand][f].Weight; if ( weight <= 0 ) continue;
+            if ( on.Length != 1 || on[0].Last - on[0].First + 1 < minimum ) continue;
+            var hand = on[0].Hand; pivotHand[f] = hand;
             FkUtil.ToWorld( frames[f], rig, world );
             var centre = Vector3.Zero; var mass = 0f;
             foreach ( var (a, b, m) in segments ) { centre += (world[a!.Value].Pos + world[b!.Value].Pos) * .5f * m; mass += m; }
             var lever = centre / mass - world[hand].Pos;
             if ( Vector3.Dot( lever, up ) <= 0 ) continue;
-            var tilt = FromTo( Vector3.Normalize( lever ), up );
-            var angle = 2 * MathF.Acos( Math.Clamp( MathF.Abs( tilt.W ), 0, 1 ) );
-            var limit = MaximumBalanceDegrees * MathF.PI / 180;
-            if ( angle > limit ) tilt = Quaternion.Slerp( Quaternion.Identity, tilt, limit / angle );
-            tilt = Quaternion.Normalize( Quaternion.Slerp( Quaternion.Identity, tilt, weight ) );
+            var axis = Vector3.Cross( Vector3.Normalize( lever ), up );
+            if ( axis.LengthSquared() < 1e-12f ) continue;
+            var angle = MathF.Min( MathF.Acos( Math.Clamp( Vector3.Dot( Vector3.Normalize( lever ), up ), -1, 1 ) ), MaximumBalanceDegrees * MathF.PI / 180 );
+            needed[f] = Vector3.Normalize( axis ) * angle * goals[hand][f].Weight;
+        }
+        // Smoothed over time, zeros included, so the tilt eases in and out instead of switching with the hand.
+        var radius = (int)MathF.Ceiling( 3 * BalanceSigmaFrames );
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            var sum = Vector3.Zero; var total = 0f; var hand = -1; var nearest = int.MaxValue;
+            for ( var j = Math.Max( 0, f - radius ); j <= Math.Min( frames.Count - 1, f + radius ); j++ )
+            {
+                var g = MathF.Exp( -.5f * (j - f) * (j - f) / (BalanceSigmaFrames * BalanceSigmaFrames) ); sum += needed[j] * g; total += g;
+                if ( pivotHand[j] >= 0 && Math.Abs( j - f ) < nearest ) { nearest = Math.Abs( j - f ); hand = pivotHand[j]; }
+            }
+            var turn = sum / total;
+            if ( hand < 0 || turn.LengthSquared() < 1e-10f ) continue;
+            var tilt = Quaternion.CreateFromAxisAngle( Vector3.Normalize( turn ), turn.Length() );
+            FkUtil.ToWorld( frames[f], rig, world );
             var pivot = world[hand].Pos;
             foreach ( var root in roots )
             {
