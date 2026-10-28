@@ -137,6 +137,8 @@ public static class CaptureHandPlant
             && mask.Length == frames.Count ? mask : new bool[frames.Count] );
         SecondHands( frames, rig, arms, parts, supported, seen, goals, bearings, up, cm, still, minimum, blend );
         Balance( frames, target, bearings, goals, up, fps );
+        var heading = arms.ToDictionary( a => a.C, a => chains[a.C] is { } chain
+            ? Headings( frames, rig, a.C, chain, target.BoneForRole( BoneRole.HandL ) == a.C, goals[a.C], up ) : null );
         var held = 0;
         for ( var f = 0; f < frames.Count; f++ )
         {
@@ -154,6 +156,11 @@ public static class CaptureHandPlant
                     // A hand carrying the body lies flat: palm onto the floor, fingers straight along it, its lowest point on the floor.
                     var down = Quaternion.Slerp( Quaternion.Identity, FromTo( PalmNormal( world, chain, a.C, target.BoneForRole( BoneRole.HandL ) == a.C ), -up ), weight );
                     rotation = Quaternion.Normalize( down * rotation );
+                    if ( heading[a.C] is { } turning && !double.IsNaN( turning[f] ) )
+                    {
+                        var turn = (float)Math.IEEERemainder( turning[f] - Heading( Vector3.Transform( frame[chain[3]].Pos, rotation ), up ), 2 * Math.PI ) * weight;
+                        rotation = Quaternion.Normalize( Quaternion.CreateFromAxisAngle( up, turn ) * rotation );
+                    }
                     Straighten( frame, chain, weight );
                     var parent0 = rig[a.C].ParentIndex;
                     frame[a.C].Rot = Quaternion.Normalize( (parent0 < 0 ? Quaternion.Identity : Quaternion.Inverse( world[parent0].Rot )) * rotation );
@@ -329,6 +336,8 @@ public static class CaptureHandPlant
     public const float MaximumBalanceDegrees = 30, BalanceMinimumSeconds = .4f, BalanceSigmaFrames = 4;
     /// <summary>The body's move over a carrying hand is smoothed over this many frames.</summary>
     public const float CarrySigmaFrames = 3;
+    /// <summary>Frames over which a flat hand's heading on the floor is smoothed.</summary>
+    public const float HeadingSigmaFrames = 3;
 
     /// <summary>Tilts a body that rests on a single hand about that wrist until its centre of mass is over it: on one
     /// hand it cannot be anywhere else without falling. The breakin clip's one-handed spin leaned 14° off the hand
@@ -408,6 +417,40 @@ public static class CaptureHandPlant
                 frame[bone].Rot = Quaternion.Normalize( Quaternion.Slerp( rotation, straight, weight ) );
             }
     }
+
+    /// <summary>Per frame of each hold, the heading a flat hand has on the floor (toward its middle knuckle), smoothed over
+    /// <see cref="HeadingSigmaFrames"/> within the hold; NaN outside holds. Through the breakin clip's spin on one hand the
+    /// support hand turned with the body, 30° a frame, which smoothing keeps; in the closing freeze the capture wobbled it
+    /// 33° over three frames and back, which it removes.</summary>
+    static double[] Headings( List<XForm[]> frames, HumanoidMocapX.Core.Skeleton.Skeleton rig, int hand, int[] chain, bool left,
+        (Vector3 Position, float Weight, bool Bearing)[] goals, Vector3 up )
+    {
+        var raw = new double[frames.Count]; Array.Fill( raw, double.NaN ); var world = new XForm[rig.Count];
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            if ( !goals[f].Bearing || goals[f].Weight <= 0 ) continue;
+            FkUtil.ToWorld( frames[f], rig, world );
+            var flat = Quaternion.Normalize( FromTo( PalmNormal( world, chain, hand, left ), -up ) * world[hand].Rot );
+            raw[f] = Heading( Vector3.Transform( frames[f][chain[3]].Pos, flat ), up );
+            if ( f > 0 && !double.IsNaN( raw[f - 1] ) ) raw[f] = raw[f - 1] + Math.IEEERemainder( raw[f] - raw[f - 1], 2 * Math.PI );
+        }
+        var smoothed = new double[frames.Count]; var radius = (int)Math.Ceiling( 3 * HeadingSigmaFrames );
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            smoothed[f] = double.NaN;
+            if ( double.IsNaN( raw[f] ) ) continue;
+            double sum = 0, total = 0;
+            // Only within this hold: the unwrapped heading is continuous there.
+            for ( var j = f; j >= Math.Max( 0, f - radius ) && !double.IsNaN( raw[j] ); j-- ) Add( j );
+            for ( var j = f + 1; j <= Math.Min( frames.Count - 1, f + radius ) && !double.IsNaN( raw[j] ); j++ ) Add( j );
+            smoothed[f] = sum / total;
+            void Add( int j ) { var g = Math.Exp( -.5 * (j - f) * (j - f) / (HeadingSigmaFrames * HeadingSigmaFrames) ); sum += g * raw[j]; total += g; }
+        }
+        return smoothed;
+    }
+
+    /// <summary>The angle of <paramref name="v"/> on the floor, increasing with turns about <paramref name="up"/>.</summary>
+    static float Heading( Vector3 v, Vector3 up ) => MathF.Atan2( Vector3.Dot( v, Vector3.Cross( up, Vector3.UnitX ) ), Vector3.Dot( v, Vector3.UnitX ) );
 
     static Quaternion FromTo( Vector3 from, Vector3 to )
     {

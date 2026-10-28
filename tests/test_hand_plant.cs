@@ -98,7 +98,24 @@ static class HandPlantTests
         MotionTests.Near(0, handParts.Min(b => down[b].Pos.Z) * Inch, 1);
         var chainR = new[] { "Prox", "Mid", "Dist" }.Select(k => Bone(Enum.Parse<BoneRole>("Middle" + k + "R"))).ToArray();
         MotionTests.Check(Vector3.Dot(Vector3.Normalize(down[chainR[1]].Pos - down[chainR[0]].Pos), Vector3.Normalize(down[chainR[2]].Pos - down[chainR[1]].Pos)) > MathF.Cos(3 * MathF.PI / 180), "The observed hand must lie flat");
-        Console.WriteLine("PASS: hand plant holds a hand carrying the body however far the capture slides, balances the body over it, lays palm and fingers flat, leaves a raised hand free, lays down a hovering hand the video shows on the floor and ignores one out of reach");
+
+        // The capture lifts the support hand 18 cm for three frames mid-slide and wobbles the body 6° either way about it
+        // every frame: still one hold in one place, and the flat hand does not wobble on the floor.
+        var rising = Enumerable.Range(0, 30).Select(f =>
+        {
+            var pose = (XForm[])rest.Clone(); var turn = Quaternion.CreateFromAxisAngle(up, (f % 2 == 0 ? 6 : -6) * MathF.PI / 180);
+            foreach (var r in roots) pose[r] = new XForm(wrist + Vector3.Transform(pose[r].Pos - wrist, turn) + new Vector3(f * 3 / Inch, 0, f is >= 12 and <= 14 ? 18 / Inch : 0), Quaternion.Normalize(turn * pose[r].Rot));
+            return pose;
+        }).ToList();
+        var liftedFrom = World(skeleton, rising[12]); MotionTests.Check(handParts.Min(b => liftedFrom[b].Pos.Z) * Inch > CaptureHandPlant.LiftCm, "Fixture hand not lifted off the floor");
+        CaptureHandPlant.Apply(rising, rig, TargetUpAxis.ZUpEngine, 30);
+        var placed = rising.Select(pose => World(skeleton, pose)).ToArray();
+        MotionTests.Check(Vector3.Distance(Flat(placed[0][handL].Pos), Flat(placed[^1][handL].Pos)) * Inch < 1, $"The support hand moved {Vector3.Distance(Flat(placed[0][handL].Pos), Flat(placed[^1][handL].Pos)) * Inch:F1} cm across the lift");
+        MotionTests.Near(0, handParts.Min(b => placed[13][b].Pos.Z) * Inch, 1);
+        var headings = placed.Select(w => { var along = w[middle].Pos - w[handL].Pos; return Math.Atan2(along.Y, along.X) * 180 / Math.PI; }).ToArray();
+        var wobble = headings.Skip(10).Zip(headings.Skip(11), (x, y) => Math.Abs(Math.IEEERemainder(y - x, 360))).Take(15).Max();
+        MotionTests.Check(wobble < 2, $"The flat support hand turned {wobble:F1} degrees in a frame");
+        Console.WriteLine("PASS: hand plant holds a hand carrying the body however far the capture slides or briefly lifts it, balances the body over it, lays palm and fingers flat without wobbling, leaves a raised hand free, lays down a hovering hand the video shows on the floor and ignores one out of reach");
     }
 
     static Vector3 Flat(Vector3 v) => v with { Z = 0 };
