@@ -181,7 +181,7 @@ public static class CaptureHandPlant
                         var turn = (float)Math.IEEERemainder( turning[f] - Heading( Vector3.Transform( frame[chain[3]].Pos, rotation ), up ), 2 * Math.PI ) * weight;
                         rotation = Quaternion.Normalize( Quaternion.CreateFromAxisAngle( up, turn ) * rotation );
                     }
-                    Straighten( frame, chain, weight );
+                    Straighten( frame, rig, chain, weight );
                     var parent0 = rig[a.C].ParentIndex;
                     frame[a.C].Rot = Quaternion.Normalize( (parent0 < 0 ? Quaternion.Identity : Quaternion.Inverse( world[parent0].Rot )) * rotation );
                     FkUtil.ToWorld( frame, rig, world );
@@ -460,19 +460,21 @@ public static class CaptureHandPlant
     }
 
     /// <summary>Turns each finger joint toward straight, by <paramref name="weight"/>: each segment continues the one
-    /// before, so a flat palm puts the fingers along the floor. Twist is kept.</summary>
-    static void Straighten( XForm[] frame, int[] chain, float weight )
+    /// before, so a flat palm puts the fingers along the floor. The roll is the rig's rest roll, not the capture's: kept,
+    /// the capture's roll twisted the fingers of a flat hand back and forth as it turned through a spin.
+    /// <paramref name="first"/> segments of each finger are left as they are.</summary>
+    static void Straighten( XForm[] frame, HumanoidMocapX.Core.Skeleton.Skeleton rig, int[] chain, float weight, int first = 0 )
     {
         for ( var finger = 0; finger < chain.Length / 3; finger++ )
-            for ( var segment = 0; segment < 3; segment++ )
+            for ( var segment = first; segment < 3; segment++ )
             {
                 var bone = chain[finger * 3 + segment];
                 // The parent's bone runs along this joint's offset; this bone runs along its child's (the tip along its own).
                 var inherited = frame[bone].Pos; var own = segment < 2 ? frame[chain[finger * 3 + segment + 1]].Pos : frame[bone].Pos;
                 if ( inherited.LengthSquared() < 1e-10f || own.LengthSquared() < 1e-10f ) continue;
-                var rotation = frame[bone].Rot;
-                var straight = Quaternion.Normalize( FromTo( Vector3.Normalize( Vector3.Transform( own, rotation ) ), Vector3.Normalize( inherited ) ) * rotation );
-                frame[bone].Rot = Quaternion.Normalize( Quaternion.Slerp( rotation, straight, weight ) );
+                var rest = rig[bone].RestLocal.Rot;
+                var straight = Quaternion.Normalize( FromTo( Vector3.Normalize( Vector3.Transform( own, rest ) ), Vector3.Normalize( inherited ) ) * rest );
+                frame[bone].Rot = Quaternion.Normalize( Quaternion.Slerp( frame[bone].Rot, straight, weight ) );
             }
     }
 
