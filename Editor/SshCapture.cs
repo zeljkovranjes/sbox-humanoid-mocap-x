@@ -38,15 +38,17 @@ internal sealed class SshCapture(SshSettings settings, CaptureOptions options, s
 
     // $1 job directory, then the worker command. The worker's stdin is /dev/null; the wrapper's own
     // stdin is the session, so its end (cancel, editor exit or a dropped connection) sends TERM, then
-    // KILL after 10 s. SIGPIPE is ignored so a dropped session cannot kill the wrapper before that.
-    // A failed or stopped job removes its directory; a finished one is left for the download.
+    // KILL while it still runs 10 s later. SIGPIPE is ignored so a dropped session cannot kill the
+    // wrapper before that. A failed or stopped job removes its directory; a finished one is left for
+    // the download.
     const string Worker = """
         trap "" PIPE
         d=$1; shift
         "$@" </dev/null &
         p=$!
         exec 3<&0
-        { while read -r line <&3; do :; done; kill -TERM "$p"; sleep 10; kill -KILL "$p"; } >/dev/null 2>&1 &
+        { while read -r line <&3; do :; done; kill -TERM "$p"; n=0
+          while kill -0 "$p"; do [ "$n" -lt 10 ] || kill -KILL "$p"; sleep 1; n=$((n+1)); done; } >/dev/null 2>&1 &
         k=$!
         wait "$p"; c=$?
         kill "$k" 2>/dev/null
