@@ -780,9 +780,10 @@ four lanes with `MOCAP_LANES=4`; see [the host guide](editor-host.md).
 
 ## Observed detail
 
-SAM 3D Body's per-frame keypoints now refine FlowHMR's motion. Fingers follow
-the hand passes, head pitch follows the face keypoints, and, when the camera
-turns less than 2° over the clip, the root follows SAM's pelvis position.
+SAM 3D Body's per-frame keypoints now refine FlowHMR's motion. Wrist turn and
+fingers follow the hand passes, head pitch follows the face keypoints, and, when
+the camera turns less than 2° over the clip, the root follows SAM's pelvis
+position.
 Both validation clips ran on an RTX 2080 Ti with the Linux worker. The
 measurements compare each capture before and after refinement against SAM's
 own observations:
@@ -798,12 +799,32 @@ range runs from its 5th to 95th percentile over the clip. FlowHMR held nearly on
 hand pose throughout. The head-pitch constant (3.15° between the head's forward
 axis and the ear-to-nose line) comes from the SMPL template's COCO face vertices.
 
+The same captures, projected through the clip's camera, were also compared
+with the image itself. The camera is fitted from the first second only, so later
+drift shows. The root is compared with the YOLOX person box, which comes from a
+different model than SAM. Finger shape is compared with SAM's 2D hand
+keypoints, wrist-aligned and in hand sizes. Nose height relative to the ears is
+compared with SAM's 2D face keypoints, in ear spans:
+
+| Clip | Root drift against the person box | Finger 2D error | Nose height error |
+| --- | ---: | ---: | ---: |
+| Breakin | 73.8 → 9.6 px | 1.12 → 0.79 | 0.141 → 0.066 |
+| Five-second clip | 12.4 → 6.3 px | 0.49 → 0.37 | 0.296 → 0.050 |
+
+Fingers alone did not lower the breakin finger error (1.12 → 1.15). FlowHMR's
+palms faced 55–89° away from SAM's (median per hand), while the forearms agreed
+within about 20°, so correct finger shapes landed on misoriented hands. Turning
+each wrist to SAM's palm brought it to 0.79. SAM's hand passes also leave
+fingertips nearly straight: 1–13° at the distal joint where the middle joint
+bends 22–38°. Fingertips are therefore bent at least two thirds as far as their
+middle joints, the relaxed-hand coupling from Rijpkema and Girard (1991).
+
 The breakin fixture's boxes, camera rotations, intrinsics, features and
 FlowHMR motion stay byte-identical to the run before this change; only
 `capture.hmotion` and both FBX exports differ. Hand-pass frames are used in
 proportion to how well each hand pass agrees with the body pass in the image:
-63% of hand frames on the breakin clip, whose gloved hands are about 30 pixels
-across, and 91% on the five-second clip. On the breakin clip's idle frames SAM
-sees the hands less curled than FlowHMR's default pose (proximal bend 22–38°
-against 50–55°). A camera that moves without turning is not detected, and its
-motion would be read as the person's.
+58–63% of hand frames on the breakin clip, whose gloved hands are about 35
+pixels across, and 91% on the five-second clip, where they are about 53. A
+single view cannot show how far fingers curl toward the camera, so curled idle
+hands can still read straighter than in the video. A camera that moves without
+turning is not detected, and its motion would be read as the person's.
