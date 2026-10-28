@@ -154,6 +154,27 @@ public static class CaptureDespike
                     var parent = rig[e].ParentIndex;
                     frames[f][e].Rot = Quaternion.Normalize( (parent < 0 ? Quaternion.Identity : Quaternion.Inverse( world[parent].Rot )) * attitude );
                 }
+                // How far the elbow or knee bends: near full stretch a few millimetres of reach swing it tens of degrees, and a
+                // held Citizen arm snapped straight and back as it was let go. A limb whose end no hold touches reaches to the
+                // distance the smoothed bend gives.
+                var bends = new float[frames.Count];
+                for ( var f = 0; f < frames.Count; f++ ) { FkUtil.ToWorld( frames[f], rig, world ); bends[f] = Bend( world[a].Pos, world[b].Pos, world[e].Pos ); }
+                corrected += Angles( bends, changed );
+                for ( var f = 0; f < frames.Count; f++ )
+                {
+                    if ( !changed[f] || holding[c][f] > 0 ) continue;
+                    FkUtil.ToWorld( frames[f], rig, world );
+                    float upper = Vector3.Distance( world[a].Pos, world[b].Pos ), lower = Vector3.Distance( world[b].Pos, world[e].Pos );
+                    var line = world[e].Pos - world[a].Pos; if ( line.LengthSquared() < 1e-10f ) continue;
+                    var reach = MathF.Sqrt( MathF.Max( 0, upper * upper + lower * lower - 2 * upper * lower * MathF.Cos( bends[f] * MathF.PI / 180 ) ) );
+                    var attitude = world[e].Rot;
+                    var bend = Vector3.Cross( world[b].Pos - world[a].Pos, world[e].Pos - world[b].Pos );
+                    if ( bend.LengthSquared() < 1e-8f ) bend = Vector3.Transform( Vector3.UnitX, world[a].Rot );
+                    var ik = TwoBoneIk.Solve( world[a].Pos, world[b].Pos, world[e].Pos, world[a].Pos + Vector3.Normalize( line ) * reach, soften: 0, stableBendAxis: bend );
+                    EffectorIk.ApplyWorldDeltas( frames[f], rig, a, b, e, ik.UpperWorldDelta, ik.LowerWorldDelta, world );
+                    FkUtil.ToWorld( frames[f], rig, world );
+                    frames[f][e].Rot = Quaternion.Normalize( Quaternion.Inverse( world[rig[e].ParentIndex].Rot ) * attitude );
+                }
                 // The elbow or knee, by turning the limb about the line from its root to its end, which stays put.
                 for ( var f = 0; f < frames.Count; f++ ) { FkUtil.ToWorld( frames[f], rig, world ); path[f] = world[b].Pos; }
                 corrected += Positions( path, changed, 1 / unitsPerCm );
@@ -293,6 +314,33 @@ public static class CaptureDespike
             var pull = Math.Clamp( (off - StartDegrees) / (FullDegrees - StartDegrees), 0, 1 );
             if ( pull <= 0 ) continue;
             track[f] = Quaternion.Normalize( Quaternion.Slerp( given[f], fit, pull ) );
+            changed[f] = true; count++;
+        }
+        return count;
+    }
+
+    /// <summary>The angle at <paramref name="joint"/> between the bones to <paramref name="root"/> and <paramref name="end"/>,
+    /// in degrees: 180 for a straight limb.</summary>
+    static float Bend( Vector3 root, Vector3 joint, Vector3 end )
+    {
+        var a = root - joint; var b = end - joint;
+        if ( a.LengthSquared() < 1e-12f || b.LengthSquared() < 1e-12f ) return 180;
+        return MathF.Acos( Math.Clamp( Vector3.Dot( Vector3.Normalize( a ), Vector3.Normalize( b ) ), -1, 1 ) ) * 180 / MathF.PI;
+    }
+
+    /// <summary>As <see cref="Rotations"/>, for angles in degrees.</summary>
+    static int Angles( float[] track, bool[] changed )
+    {
+        var frames = track.Length; var half = Window / 2;
+        var given = (float[])track.Clone();
+        Array.Clear( changed ); var count = 0;
+        for ( var f = half; f < frames - half; f++ )
+        {
+            var fit = 0f;
+            for ( var k = -half; k <= half; k++ ) fit += given[f + k] * (float)Weights[k + half];
+            var pull = Math.Clamp( (MathF.Abs( fit - given[f] ) - StartDegrees) / (FullDegrees - StartDegrees), 0, 1 );
+            if ( pull <= 0 ) continue;
+            track[f] = Math.Min( 180, given[f] + (fit - given[f]) * pull );
             changed[f] = true; count++;
         }
         return count;
