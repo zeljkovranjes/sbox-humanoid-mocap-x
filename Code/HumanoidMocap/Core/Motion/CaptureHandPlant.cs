@@ -101,7 +101,9 @@ public static class CaptureHandPlant
                     // The lowest hand under a raised body still carries it while the capture lifts it for a moment: through the
                     // breakin clip's one-handed spin it lifted the support hand up to 22 cm for three to five frames, and each
                     // touch after that landed somewhere new. Up to BlendSeconds of that stays one hold.
-                    var g = e + 1; while ( g < frames.Count && g - e <= blend && supported[g] && Lowest( g ) && !Resting( g, NearFloorCm ) ) g++;
+                    // A hand that touches down again within ShortLiftFrames never really left: on the Citizen two of the breakin
+                    // clip's touches, a frame apart, each landed elsewhere and the hand jumped 18–30 cm between them.
+                    var g = e + 1; while ( g < frames.Count && g - e <= blend && (supported[g] && Lowest( g ) || g - e <= ShortLiftFrames) && !Resting( g, NearFloorCm ) ) g++;
                     if ( g == e + 1 || g >= frames.Count || g - e > blend || !Resting( g, NearFloorCm ) ) break;
                     e = g;
                 }
@@ -342,6 +344,8 @@ public static class CaptureHandPlant
     public const float MaximumBalanceDegrees = 30, BalanceMinimumSeconds = .4f, BalanceSigmaFrames = 4;
     /// <summary>The body's move over a carrying hand is smoothed over this many frames.</summary>
     public const float CarrySigmaFrames = 3;
+    /// <summary>A hand off the floor for at most this many frames between two touches stays where it was.</summary>
+    public const int ShortLiftFrames = 2;
     /// <summary>Frames over which a flat hand's heading on the floor is smoothed.</summary>
     public const float HeadingSigmaFrames = 3;
 
