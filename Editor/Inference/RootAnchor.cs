@@ -45,10 +45,10 @@ internal static class RootAnchor
             MotionPose.World(document, document.Frames[f], world, position);
             pelvis[f] = (position[legL] + position[legR]) / 2;
             // SAM's translation is the body origin; its keypoints are relative to it.
-            observed[f] = Point(k, SamObservations.Translation / 3) + (Point(k, LeftHip) + Point(k, RightHip)) / 2;
-            seen[f * 3] = Point(k, RightShoulder) - Point(k, LeftShoulder);
-            seen[f * 3 + 1] = Point(k, RightHip) - Point(k, LeftHip);
-            seen[f * 3 + 2] = Point(k, LeftShoulder) + Point(k, RightShoulder) - Point(k, LeftHip) - Point(k, RightHip);
+            observed[f] = SamObservations.Point(k, SamObservations.Translation / 3) + (SamObservations.Point(k, LeftHip) + SamObservations.Point(k, RightHip)) / 2;
+            seen[f * 3] = SamObservations.Point(k, RightShoulder) - SamObservations.Point(k, LeftShoulder);
+            seen[f * 3 + 1] = SamObservations.Point(k, RightHip) - SamObservations.Point(k, LeftHip);
+            seen[f * 3 + 2] = SamObservations.Point(k, LeftShoulder) + SamObservations.Point(k, RightShoulder) - SamObservations.Point(k, LeftHip) - SamObservations.Point(k, RightHip);
             posed[f * 3] = position[armR] - position[armL];
             posed[f * 3 + 1] = position[legR] - position[legL];
             posed[f * 3 + 2] = position[armL] + position[armR] - position[legL] - position[legR];
@@ -87,5 +87,4 @@ internal static class RootAnchor
         return true;
     }
 
-    static Vector3 Point(ReadOnlySpan<float> points, int i) => new(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]);
 }

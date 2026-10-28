@@ -82,12 +82,12 @@ internal static class FingerTransfer
     static double Observe(ReadOnlySpan<float> observation, bool left, Span<Vector3> directions)
     {
         var hand = observation.Slice(left ? SamObservations.LeftHand : SamObservations.RightHand, SamObservations.HandPoints * 3);
-        if (!Palm(Point(hand, Wrist), Point(hand, IndexBase), Point(hand, MiddleBase), Point(hand, PinkyBase), out var palm)) return 0;
+        if (!Palm(SamObservations.Point(hand, Wrist), SamObservations.Point(hand, IndexBase), SamObservations.Point(hand, MiddleBase), SamObservations.Point(hand, PinkyBase), out var palm)) return 0;
         Matrix4x4.Invert(palm, out var toPalm);
         for (var finger = 0; finger < 5; finger++)
             for (var segment = 0; segment < 3; segment++)
             {
-                var from = Point(hand, finger * 4 + 3 - segment); var to = Point(hand, finger * 4 + 2 - segment);
+                var from = SamObservations.Point(hand, finger * 4 + 3 - segment); var to = SamObservations.Point(hand, finger * 4 + 2 - segment);
                 var direction = Vector3.TransformNormal(to - from, toPalm);
                 if (!(direction.LengthSquared() > 1e-12f) || !float.IsFinite(direction.X + direction.Y + direction.Z)) return 0;
                 directions[finger * 3 + segment] = Vector3.Normalize(direction);
@@ -125,7 +125,6 @@ internal static class FingerTransfer
         return total / SamObservations.HandPoints / size;
     }
 
-    static Vector3 Point(ReadOnlySpan<float> points, int i) => new(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]);
 
     static double Square(double value) => value * value;
 
