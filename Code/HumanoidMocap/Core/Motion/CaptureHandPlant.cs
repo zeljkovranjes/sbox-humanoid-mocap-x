@@ -45,7 +45,7 @@ public static class CaptureHandPlant
     /// <returns>The number of hand samples held.</returns>
     /// <param name="observed">Frames in which the video shows each hand on the floor under a raised body, by hand role;
     /// such a hand is planted even where the capture lifted it.</param>
-    public static int Apply( List<XForm[]> frames, TargetRig target, TargetUpAxis axis, float fps, IReadOnlyDictionary<BoneRole, bool[]>? observed = null )
+    public static int Apply( List<XForm[]> frames, TargetRig target, TargetUpAxis axis, float fps, IReadOnlyDictionary<BoneRole, bool[]> observed = null )
     {
         if ( frames.Count < 3 || fps <= 0 ) return 0;
         var rig = target.Skeleton; var up = axis == TargetUpAxis.YUpCm ? Vector3.UnitY : Vector3.UnitZ;
