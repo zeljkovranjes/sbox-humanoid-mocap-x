@@ -72,24 +72,41 @@ public static class CaptureDespike
             for ( var c = 0; c < chains.Length; c++ ) held[c][f] = world[chains[c].C];
         }
         var still = StillCm * unitsPerCm;
-        var holding = chains.Select( _ => new float[frames.Count] ).ToArray();
-        for ( var c = 0; c < chains.Length; c++ )
-            for ( var f = 1; f + 1 < frames.Count; f++ )
-            {
-                if ( Vector3.Distance( held[c][f].Pos, held[c][f - 1].Pos ) >= still || Vector3.Distance( held[c][f + 1].Pos, held[c][f].Pos ) >= still ) continue;
-                for ( var j = Math.Max( 0, f - EaseFrames ); j <= Math.Min( frames.Count - 1, f + EaseFrames ); j++ )
-                {
-                    var w = 1 - Math.Abs( j - f ) / (float)(EaseFrames + 1); w = w * w * (3 - 2 * w);
-                    holding[c][j] = Math.Max( holding[c][j], w );
-                }
-            }
+        var holding = held.Select( track => Holding( track.Select( x => x.Pos ).ToArray(), still ) ).ToArray();
+        // Toes too: through toe-off the toe stays planted while the ankle lifts, so it is held on its own.
+        var toes = new[] { BoneRole.ToeL, BoneRole.ToeR }.Select( target.BoneForRole ).Where( b => b is int t && rig[t].ParentIndex >= 0 ).Select( b => b!.Value ).ToArray();
+        var toesHeld = toes.Select( _ => new Vector3[frames.Count] ).ToArray();
+        for ( var f = 0; f < frames.Count; f++ )
+        {
+            FkUtil.ToWorld( frames[f], rig, world );
+            for ( var t = 0; t < toes.Length; t++ ) toesHeld[t][f] = world[toes[t]].Pos;
+        }
+        var toesHolding = toesHeld.Select( track => Holding( track, still ) ).ToArray();
         // Three rounds: each world-space reach can leave a joint above it slightly off its path for the next round to take out.
         var corrected = 0;
-        for ( var round = 0; round < 3; round++ ) corrected += Settle( frames, target, unitsPerCm, chains, held, holding );
+        for ( var round = 0; round < 3; round++ ) corrected += Settle( frames, target, unitsPerCm, chains, held, holding, toes, toesHeld, toesHolding );
         return corrected;
     }
 
-    static int Settle( List<XForm[]> frames, TargetRig target, float unitsPerCm, (int A, int B, int C)[] chains, XForm[][] before, float[][] holding )
+    /// <summary>How firmly a joint following <paramref name="path"/> is held per frame: 1 where it moves less than
+    /// <paramref name="still"/> to either neighbour, easing out over EaseFrames on either side so a hold ends without a step.</summary>
+    static float[] Holding( Vector3[] path, float still )
+    {
+        var weight = new float[path.Length];
+        for ( var f = 1; f + 1 < path.Length; f++ )
+        {
+            if ( Vector3.Distance( path[f], path[f - 1] ) >= still || Vector3.Distance( path[f + 1], path[f] ) >= still ) continue;
+            for ( var j = Math.Max( 0, f - EaseFrames ); j <= Math.Min( path.Length - 1, f + EaseFrames ); j++ )
+            {
+                var w = 1 - Math.Abs( j - f ) / (float)(EaseFrames + 1); w = w * w * (3 - 2 * w);
+                weight[j] = Math.Max( weight[j], w );
+            }
+        }
+        return weight;
+    }
+
+    static int Settle( List<XForm[]> frames, TargetRig target, float unitsPerCm, (int A, int B, int C)[] chains, XForm[][] before, float[][] holding,
+        int[] toes, Vector3[][] toesHeld, float[][] toesHolding )
     {
         var rig = target.Skeleton; var world = new XForm[rig.Count];
         var corrected = Apply( frames, rig, unitsPerCm );
@@ -104,9 +121,6 @@ public static class CaptureDespike
                 FkUtil.ToWorld( frames[f], rig, world );
                 var goal = Vector3.Lerp( world[e].Pos, before[c][f].Pos, w );
                 var attitude = Quaternion.Normalize( Quaternion.Slerp( world[e].Rot, before[c][f].Rot, w ) );
-                // A limb the cleanup held at full stretch (leaning the shoulder in) may have lost its reach to the smoothing.
-                CaptureHandPlant.Lean( frames[f], rig, world, rig[a].ParentIndex, a, goal,
-                    Vector3.Distance( world[a].Pos, world[b].Pos ) + Vector3.Distance( world[b].Pos, world[e].Pos ), CaptureHandPlant.MaximumShoulderDegrees );
                 var bend = Vector3.Cross( world[b].Pos - world[a].Pos, world[e].Pos - world[b].Pos );
                 if ( bend.LengthSquared() < 1e-8f ) bend = Vector3.Transform( Vector3.UnitX, world[a].Rot );
                 var ik = TwoBoneIk.Solve( world[a].Pos, world[b].Pos, world[e].Pos, goal, soften: 0, stableBendAxis: bend );
@@ -117,8 +131,8 @@ public static class CaptureDespike
             }
         }
         // Joint turns that each follow a smooth path can still add up to a flick at the hand or foot (a dancer's foot
-        // doubled back 5 cm at the top of a swing): each limb's end is despiked in the world too, its limb reaching
-        // for the fitted place with the end's attitude kept.
+        // doubled back 5 cm at the top of a swing): each limb's end is despiked too, its limb reaching for the fitted place
+        // with the end's attitude kept.
         var path = new Vector3[frames.Count]; var changed = new bool[frames.Count];
         for ( var pass = 0; pass < Passes; pass++ )
             for ( var c = 0; c < chains.Length; c++ )
@@ -139,6 +153,27 @@ public static class CaptureDespike
                     FkUtil.ToWorld( frames[f], rig, world );
                     var parent = rig[e].ParentIndex;
                     frames[f][e].Rot = Quaternion.Normalize( (parent < 0 ? Quaternion.Identity : Quaternion.Inverse( world[parent].Rot )) * attitude );
+                }
+                // How far the elbow or knee bends: near full stretch a few millimetres of reach swing it tens of degrees, and a
+                // held Citizen arm snapped straight and back as it was let go. A limb whose end no hold touches reaches to the
+                // distance the smoothed bend gives.
+                var bends = new float[frames.Count];
+                for ( var f = 0; f < frames.Count; f++ ) { FkUtil.ToWorld( frames[f], rig, world ); bends[f] = Bend( world[a].Pos, world[b].Pos, world[e].Pos ); }
+                corrected += Angles( bends, changed );
+                for ( var f = 0; f < frames.Count; f++ )
+                {
+                    if ( !changed[f] || holding[c][f] > 0 ) continue;
+                    FkUtil.ToWorld( frames[f], rig, world );
+                    float upper = Vector3.Distance( world[a].Pos, world[b].Pos ), lower = Vector3.Distance( world[b].Pos, world[e].Pos );
+                    var line = world[e].Pos - world[a].Pos; if ( line.LengthSquared() < 1e-10f ) continue;
+                    var reach = MathF.Sqrt( MathF.Max( 0, upper * upper + lower * lower - 2 * upper * lower * MathF.Cos( bends[f] * MathF.PI / 180 ) ) );
+                    var attitude = world[e].Rot;
+                    var bend = Vector3.Cross( world[b].Pos - world[a].Pos, world[e].Pos - world[b].Pos );
+                    if ( bend.LengthSquared() < 1e-8f ) bend = Vector3.Transform( Vector3.UnitX, world[a].Rot );
+                    var ik = TwoBoneIk.Solve( world[a].Pos, world[b].Pos, world[e].Pos, world[a].Pos + Vector3.Normalize( line ) * reach, soften: 0, stableBendAxis: bend );
+                    EffectorIk.ApplyWorldDeltas( frames[f], rig, a, b, e, ik.UpperWorldDelta, ik.LowerWorldDelta, world );
+                    FkUtil.ToWorld( frames[f], rig, world );
+                    frames[f][e].Rot = Quaternion.Normalize( Quaternion.Inverse( world[rig[e].ParentIndex].Rot ) * attitude );
                 }
                 // The elbow or knee, by turning the limb about the line from its root to its end, which stays put.
                 for ( var f = 0; f < frames.Count; f++ ) { FkUtil.ToWorld( frames[f], rig, world ); path[f] = world[b].Pos; }
@@ -175,32 +210,59 @@ public static class CaptureDespike
             }
         }
         // The head and each finger's middle and last joint, by turning the bone above toward the fitted place; the joint
-        // keeps its attitude.
-        var aimed = new List<int>();
-        if ( target.BoneForRole( BoneRole.Head ) is int head ) aimed.Add( head );
-        foreach ( var finger in new[] { "Thumb", "Index", "Middle", "Ring", "Pinky" } )
-            foreach ( var side in new[] { "L", "R" } )
+        // keeps its attitude. Each path is followed in the frame of the bone that carries it (a finger in its hand's, the head
+        // in the chest's), so a hand spinning on the floor does not read as fingers flicking: fitted in the world, the arcs
+        // its fingertips swept at 30–40° a frame were pulled inward and tipped the flat fingers up to 8 cm off the floor.
+        var aimed = new List<(int Joint, int Frame)>();
+        if ( target.BoneForRole( BoneRole.Head ) is int head && rig[head].ParentIndex is var neck && neck >= 0 && rig[neck].ParentIndex >= 0 )
+            aimed.Add( (head, rig[neck].ParentIndex) );
+        foreach ( var side in new[] { "L", "R" } )
+        {
+            if ( target.BoneForRole( Enum.Parse<BoneRole>( "Hand" + side ) ) is not int hand ) continue;
+            foreach ( var finger in new[] { "Thumb", "Index", "Middle", "Ring", "Pinky" } )
                 foreach ( var joint in new[] { "Mid", "Dist" } )
-                    if ( Enum.TryParse<BoneRole>( finger + joint + side, out var role ) && target.BoneForRole( role ) is int bone ) aimed.Add( bone );
-        foreach ( var joint in aimed )
+                    if ( Enum.TryParse<BoneRole>( finger + joint + side, out var role ) && target.BoneForRole( role ) is int bone ) aimed.Add( (bone, hand) );
+        }
+        foreach ( var (joint, carrier) in aimed )
         {
             var above = rig[joint].ParentIndex; if ( above < 0 || rig[above].ParentIndex < 0 ) continue;
             for ( var pass = 0; pass < Passes; pass++ )
             {
-                for ( var f = 0; f < frames.Count; f++ ) { FkUtil.ToWorld( frames[f], rig, world ); path[f] = world[joint].Pos; }
+                for ( var f = 0; f < frames.Count; f++ )
+                {
+                    FkUtil.ToWorld( frames[f], rig, world );
+                    path[f] = Local( world[carrier], world[joint].Pos );
+                }
                 corrected += Positions( path, changed, 1 / unitsPerCm );
                 for ( var f = 0; f < frames.Count; f++ )
                 {
                     if ( !changed[f] ) continue;
                     FkUtil.ToWorld( frames[f], rig, world );
-                    var from = world[joint].Pos - world[above].Pos; var to = path[f] - world[above].Pos;
+                    var place = Global( world[carrier], path[f] );
+                    var from = world[joint].Pos - world[above].Pos; var to = place - world[above].Pos;
                     if ( from.LengthSquared() < 1e-10f || to.LengthSquared() < 1e-10f ) continue;
                     Turn( frames[f], rig, world, above, MathQ.FromTo( Vector3.Normalize( from ), Vector3.Normalize( to ) ), joint );
                 }
             }
         }
+        // Held toes back where they were, by turning their foot about the ankle.
+        for ( var t = 0; t < toes.Length; t++ )
+        {
+            var foot = rig[toes[t]].ParentIndex;
+            for ( var f = 0; f < frames.Count; f++ )
+            {
+                var w = toesHolding[t][f]; if ( w <= 0 ) continue;
+                FkUtil.ToWorld( frames[f], rig, world );
+                var from = world[toes[t]].Pos - world[foot].Pos; var to = Vector3.Lerp( world[toes[t]].Pos, toesHeld[t][f], w ) - world[foot].Pos;
+                if ( from.LengthSquared() < 1e-10f || to.LengthSquared() < 1e-10f ) continue;
+                Turn( frames[f], rig, world, foot, MathQ.FromTo( Vector3.Normalize( from ), Vector3.Normalize( to ) ), toes[t] );
+            }
+        }
         return corrected;
     }
+
+    static Vector3 Local( XForm frame, Vector3 point ) => Vector3.Transform( point - frame.Pos, Quaternion.Inverse( frame.Rot ) );
+    static Vector3 Global( XForm frame, Vector3 point ) => frame.Pos + Vector3.Transform( point, frame.Rot );
 
     /// <summary>Turns <paramref name="bone"/> in the world by <paramref name="turn"/> about its own joint, keeping the
     /// world attitude of <paramref name="kept"/> below it.</summary>
@@ -266,6 +328,33 @@ public static class CaptureDespike
             var pull = Math.Clamp( (off - StartDegrees) / (FullDegrees - StartDegrees), 0, 1 );
             if ( pull <= 0 ) continue;
             track[f] = Quaternion.Normalize( Quaternion.Slerp( given[f], fit, pull ) );
+            changed[f] = true; count++;
+        }
+        return count;
+    }
+
+    /// <summary>The angle at <paramref name="joint"/> between the bones to <paramref name="root"/> and <paramref name="end"/>,
+    /// in degrees: 180 for a straight limb.</summary>
+    static float Bend( Vector3 root, Vector3 joint, Vector3 end )
+    {
+        var a = root - joint; var b = end - joint;
+        if ( a.LengthSquared() < 1e-12f || b.LengthSquared() < 1e-12f ) return 180;
+        return MathF.Acos( Math.Clamp( Vector3.Dot( Vector3.Normalize( a ), Vector3.Normalize( b ) ), -1, 1 ) ) * 180 / MathF.PI;
+    }
+
+    /// <summary>As <see cref="Rotations"/>, for angles in degrees.</summary>
+    static int Angles( float[] track, bool[] changed )
+    {
+        var frames = track.Length; var half = Window / 2;
+        var given = (float[])track.Clone();
+        Array.Clear( changed ); var count = 0;
+        for ( var f = half; f < frames - half; f++ )
+        {
+            var fit = 0f;
+            for ( var k = -half; k <= half; k++ ) fit += given[f + k] * (float)Weights[k + half];
+            var pull = Math.Clamp( (MathF.Abs( fit - given[f] ) - StartDegrees) / (FullDegrees - StartDegrees), 0, 1 );
+            if ( pull <= 0 ) continue;
+            track[f] = Math.Min( 180, given[f] + (fit - given[f]) * pull );
             changed[f] = true; count++;
         }
         return count;

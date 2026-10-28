@@ -9,6 +9,7 @@ HandTransferTests.Run();
 HandContactTests.Run();
 FingerTransferTests.Run();
 HeadPitchTests.Run();
+LimbBendTests.Run();
 RootAnchorTests.Run();
 CaptureSpinTests.Run();
 CaptureDespikeTests.Run();
