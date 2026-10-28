@@ -59,9 +59,15 @@ public static class CaptureHandPlant
         var parts = arms.ToDictionary( a => a.C, a => CaptureSeat.HandParts( target, a.C ) );
         var feet = new[] { BoneRole.FootL, BoneRole.ToeL, BoneRole.FootR, BoneRole.ToeR }.Select( target.BoneForRole ).ToArray();
         var supported = new bool[frames.Count];
-        // Finger chains (proximal, middle, distal for index to pinky) of each hand, where the rig has them all.
-        var chains = arms.ToDictionary( a => a.C, a => Fingers[target.BoneForRole( BoneRole.HandL ) == a.C ? 0 : 1].Select( target.BoneForRole ).ToArray() is var bones
-            && bones.All( b => b is int ) ? bones.Select( b => b!.Value ).ToArray() : null );
+        // Finger chains (proximal, middle, distal) of each hand: index and middle, then ring and pinky where the rig has them.
+        // The Citizen has no pinky; without it none of its hands lay flat, and a planted wrist bobbed up to 21 cm as the
+        // capture's long fingers swung under it.
+        var chains = arms.ToDictionary( a => a.C, a =>
+        {
+            var fingers = Fingers[target.BoneForRole( BoneRole.HandL ) == a.C ? 0 : 1].Chunk( 3 ).Select( f => f.Select( target.BoneForRole ).ToArray() ).ToArray();
+            if ( fingers.Take( 2 ).Any( f => f.Any( b => b is null ) ) ) return null;
+            return fingers.Where( f => f.All( b => b is int ) ).SelectMany( f => f.Select( b => b!.Value ) ).ToArray();
+        } );
         var wrist = arms.ToDictionary( a => a.C, _ => new Vector3[frames.Count] );
         var lowest = arms.ToDictionary( a => a.C, _ => new float[frames.Count] );
         for ( var f = 0; f < frames.Count; f++ )
@@ -390,11 +396,11 @@ public static class CaptureHandPlant
         }
     }
 
-    /// <summary>The direction the palm faces, from the wrist and the index, middle and pinky knuckles. The back of a
-    /// right hand faces along (knuckle line × index-to-pinky); a left hand mirrors it.</summary>
+    /// <summary>The direction the palm faces, from the wrist and the index, middle and outermost knuckles. The back of a
+    /// right hand faces along (knuckle line × index-to-outermost); a left hand mirrors it.</summary>
     static Vector3 PalmNormal( XForm[] world, int[] chain, int hand, bool left )
     {
-        var along = world[chain[3]].Pos - world[hand].Pos; var across = world[chain[0]].Pos - world[chain[9]].Pos;
+        var along = world[chain[3]].Pos - world[hand].Pos; var across = world[chain[0]].Pos - world[chain[^3]].Pos;
         var normal = Vector3.Cross( along, across );
         if ( normal.LengthSquared() < 1e-10f ) return Vector3.Zero;
         normal = Vector3.Normalize( normal );
@@ -405,7 +411,7 @@ public static class CaptureHandPlant
     /// before, so a flat palm puts the fingers along the floor. Twist is kept.</summary>
     static void Straighten( XForm[] frame, int[] chain, float weight )
     {
-        for ( var finger = 0; finger < 4; finger++ )
+        for ( var finger = 0; finger < chain.Length / 3; finger++ )
             for ( var segment = 0; segment < 3; segment++ )
             {
                 var bone = chain[finger * 3 + segment];
