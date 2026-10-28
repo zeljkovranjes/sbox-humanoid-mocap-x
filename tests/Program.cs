@@ -5,6 +5,7 @@ BodyClearanceTests.Run();
 VideoLayoutTests.Run();
 MotionTests.Run();
 FingerTests.Run();
+FingerTransferTests.Run();
 CameraTests.Run();
 InferenceTests.Run();
 RefinerTests.Run();
