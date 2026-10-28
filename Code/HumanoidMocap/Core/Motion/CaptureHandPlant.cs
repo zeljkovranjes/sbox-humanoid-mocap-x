@@ -169,7 +169,9 @@ public static class CaptureHandPlant
                 var (position, weight, bearing, lifting) = goals[a.C][f]; if ( weight <= 0 ) continue;
                 FkUtil.ToWorld( frame, rig, world );
                 var rotation = world[a.C].Rot;
-                if ( bearing && chains[a.C] is { } chain )
+                // Any hand held on the floor lies flat on it, carrying the body or not: a crouching dancer's hand resting on the
+                // floor stood on its fingertips with the wrist 8–14 cm up where the clip shows the palm flat.
+                if ( chains[a.C] is { } chain )
                 {
                     // A hand carrying the body lies flat: palm onto the floor, fingers straight along it, its lowest point on the floor.
                     var down = Quaternion.Slerp( Quaternion.Identity, FromTo( PalmNormal( world, chain, a.C, target.BoneForRole( BoneRole.HandL ) == a.C ), -up ), weight );
