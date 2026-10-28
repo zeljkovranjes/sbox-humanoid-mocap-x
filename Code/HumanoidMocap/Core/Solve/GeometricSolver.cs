@@ -250,6 +250,7 @@ public sealed class GeometricSolver : IRetargetSolver
         /// fallback below) is disabled — see <see cref="SolveOptions.TransferModes"/>.</summary>
         private readonly bool _explicitModes;
         private readonly bool _captureClavicleDirections;
+        private readonly bool _neutralSourceRest;
         private readonly bool _groundedLegDirections;
 
         public Plan(SourceScene source, Clip clip, MappingResult srcMap, TargetRig rig, SolveOptions options)
@@ -259,6 +260,7 @@ public sealed class GeometricSolver : IRetargetSolver
             _tgt = rig.Skeleton;
             _explicitModes = options.TransferModes is not null;
             _captureClavicleDirections = options.CaptureClavicleDirections;
+            _neutralSourceRest = options.NeutralSourceRest;
             _groundedLegDirections = options.GroundedLegDirections;
             _modes = options.TransferModes ?? SolveOptions.DefaultTransferModes;
 
@@ -471,7 +473,7 @@ public sealed class GeometricSolver : IRetargetSolver
             if (!_explicitModes
                 && role == BoneRole.Head
                 && !_srcCanon.HasVirtualPrimary(role) && !_tgtCanon.HasVirtualPrimary(role)
-                && IsPosedRestHead(_srcCanon))
+                && !_neutralSourceRest && IsPosedRestHead(_srcCanon))
             {
                 mode = RoleTransferMode.AbsoluteDirection;
             }

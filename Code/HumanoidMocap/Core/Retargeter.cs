@@ -796,6 +796,7 @@ public static class Retargeter
             TransferFingers = requested.TransferFingers,
             TransferModes = requested.TransferModes,
             CaptureClavicleDirections = captureClavicleDirections,
+            NeutralSourceRest = captureClavicleDirections,
             ClipIndex = take,
             ClipName = clipName,
         });

@@ -70,6 +70,12 @@ public sealed class SolveOptions
     // other per-role default heuristics active, and honor explicit transfer modes.
     internal bool CaptureClavicleDirections { get; init; }
 
+    // A capture's source rest is the body model's zero pose, which is neutral by definition: its head leans forward from
+    // the neck only because of where the model puts the skull's pivot (37.3° on SMPL), not because the bind is posed. The
+    // posed-rest head fallback read that lean as chin-down and drove the head to match it absolutely, pitching the
+    // Citizen's head (rest lean −2.3°) 40° down in every frame and the Human's 12°.
+    internal bool NeutralSourceRest { get; init; }
+
     /// <summary>
     /// Scale applied to the pelvis translation components perpendicular to the character up
     /// direction. Null (default) = automatic: target hip height / source hip height, both
