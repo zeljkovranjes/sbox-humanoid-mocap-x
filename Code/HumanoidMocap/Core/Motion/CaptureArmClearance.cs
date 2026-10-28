@@ -16,6 +16,9 @@ using Vector3 = System.Numerics.Vector3;
 /// Keeps forearms and hand-bone segments outside a bone-derived torso proxy, using
 /// DigitalRune CCD with temporal easing. Preserves bone lengths, wrist world attitude
 /// and finger articulation. Proxy clearance does not guarantee skinned-mesh clearance.
+/// A contact briefer than the easing is only eased out as far as the eased offset reaches:
+/// pushing a Citizen's hand fully out of its head proxy for the two frames it swept through
+/// it threw the hand 23 cm in one frame.
 /// </summary>
 public static class CaptureArmClearance
 {
@@ -75,8 +78,9 @@ public static class CaptureArmClearance
             if (!ArmContactSurface.TryCreate(world, hips, neck, left.Upper, right.Upper, out var surface)) continue;
             for (var side = 0; side < arms.Length; side++)
             {
-                var offset = surface.ToWorldOffset(Smooth(offsets[side], frameIndex, weights));
-                var solved = arms[side].Solve(pose, surface, offset, surface.Across * (side == 0 ? 1 : -1));
+                var eased = Smooth(offsets[side], frameIndex, weights); var raw = offsets[side][frameIndex].Length();
+                var strength = raw > 1e-5f ? Math.Min(1, eased.Length() / raw) : 1;
+                var solved = arms[side].Solve(pose, surface, surface.ToWorldOffset(eased), surface.Across * (side == 0 ? 1 : -1), strength);
                 var distance = solved.Move.Length();
                 if (distance > 1e-5f) { samples++; largest = Math.Max(largest, distance); }
                 if (solved.Residual > 0) { unresolved++; maximumPenetration = Math.Max(maximumPenetration, solved.Residual); }

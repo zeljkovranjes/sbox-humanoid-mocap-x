@@ -46,7 +46,9 @@ internal sealed class ArmContactSolver
         tolerance = Math.Max(1e-5f, armLength * 1e-5f);
     }
 
-    internal (Vector3 Move, float Residual) Solve(XForm[] pose, ArmContactSurface surface, Vector3 offset, Vector3 fallback)
+    /// <param name="strength">How much of the contact left after <paramref name="offset"/> is resolved, 0 to 1: the arm
+    /// turns that share of the way from the offset pose to the contact-free one.</param>
+    internal (Vector3 Move, float Residual) Solve(XForm[] pose, ArmContactSurface surface, Vector3 offset, Vector3 fallback, float strength = 1)
     {
         FkUtil.ToWorld(pose, skeleton, world);
         var originalPosition = world[hand].Pos;
@@ -54,6 +56,7 @@ internal sealed class ArmContactSolver
         fallback = surface.Outward(originalPosition, fallback);
         if (offset.LengthSquared() > tolerance * tolerance)
             MoveWrist(pose, originalPosition + offset, orientation, fallback);
+        var offsetUpper = pose[upper].Rot; var offsetLower = pose[lower].Rot;
         var bestUpper = pose[upper].Rot; var bestLower = pose[lower].Rot; var bestHand = pose[hand].Rot;
         var bestResidual = float.PositiveInfinity;
         for (var iteration = 0; iteration <= ContactIterations; iteration++)
@@ -78,6 +81,13 @@ internal sealed class ArmContactSolver
             }
         }
         pose[upper].Rot = bestUpper; pose[lower].Rot = bestLower; pose[hand].Rot = bestHand;
+        if (strength < 1)
+        {
+            pose[upper].Rot = MathQ.Normalize(Quaternion.Slerp(offsetUpper, bestUpper, Math.Max(0, strength)));
+            pose[lower].Rot = MathQ.Normalize(Quaternion.Slerp(offsetLower, bestLower, Math.Max(0, strength)));
+            RestoreWrist(pose, orientation);
+            bestResidual = Penetration(surface, fallback, out _, out _).Length();
+        }
         FkUtil.ToWorld(pose, skeleton, world);
         return (world[hand].Pos - originalPosition, bestResidual <= tolerance ? 0 : bestResidual);
     }
