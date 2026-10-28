@@ -1,5 +1,5 @@
 using Sandbox;
-using TensorInference;
+using HumanoidMocapX.TensorInference;
 
 namespace HumanoidMocapX.Inference;
 

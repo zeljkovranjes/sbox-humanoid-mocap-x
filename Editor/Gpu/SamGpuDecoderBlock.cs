@@ -2,7 +2,7 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 using System;
 using Sandbox;
-using TensorInference;
+using HumanoidMocapX.TensorInference;
 
 namespace HumanoidMocapX.Inference;
 

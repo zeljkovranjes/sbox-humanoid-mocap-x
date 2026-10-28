@@ -21,7 +21,7 @@
     <Compile Include="../Editor/Inference/*.cs" />
     <Compile Include="../tests/test_denoiser.cs;../tests/test_refiner.cs;../tests/test_motion.cs;../tests/common/denoiser_reference.cs" />
     <ProjectReference Include="Core.csproj" />
-    <ProjectReference Include="../../../shaders/compute/tensor-inference/dev/Build.csproj" />
+    <ProjectReference Include="Tensor.csproj" />
     <Reference Include="$(FACEPUNCH_ENGINE)/bin/managed/*.dll" />
   </ItemGroup>
 </Project>

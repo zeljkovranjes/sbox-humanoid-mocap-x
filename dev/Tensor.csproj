@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><AssemblyName>package.notpointless.chomnr_humanoid_mocap_x.tensor</AssemblyName></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Code/Tensor/*.cs" />
+    <Reference Include="$(FACEPUNCH_ENGINE)/bin/managed/*.dll" />
+  </ItemGroup>
+</Project>

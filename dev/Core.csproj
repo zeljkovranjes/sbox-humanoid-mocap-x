@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><AssemblyName>package.notpointless.chomnr_humanoid_mocap_x</AssemblyName></PropertyGroup>
   <ItemGroup>
-    <Compile Include="../Code/**/*.cs" Exclude="../Code/obj/**;../Code/Properties/**" />
+    <!-- Code/Tensor needs the engine; Tensor.csproj builds it so Core and the tests stay engine-free. -->
+    <Compile Include="../Code/**/*.cs" Exclude="../Code/obj/**;../Code/Properties/**;../Code/Tensor/**" />
   </ItemGroup>
 </Project>

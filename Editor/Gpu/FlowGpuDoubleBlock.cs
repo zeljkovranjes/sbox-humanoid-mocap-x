@@ -1,6 +1,6 @@
 // C# adaptation of FlowHMR's MMDoubleStreamBlock. See THIRD_PARTY_NOTICES.md.
 using Sandbox;
-using TensorInference;
+using HumanoidMocapX.TensorInference;
 
 namespace HumanoidMocapX.Inference;
 

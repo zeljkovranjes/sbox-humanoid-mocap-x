@@ -1,6 +1,6 @@
 using HumanoidMocapX.Inference;
 using Sandbox;
-using TensorInference;
+using HumanoidMocapX.TensorInference;
 
 namespace HumanoidMocapX.Checks;
 

@@ -1,7 +1,7 @@
 // C# adaptation of FlowHMR's SingleTokenRefiner. See THIRD_PARTY_NOTICES.md.
 using System.Threading;
 using Sandbox;
-using TensorInference;
+using HumanoidMocapX.TensorInference;
 
 namespace HumanoidMocapX.Inference;
 

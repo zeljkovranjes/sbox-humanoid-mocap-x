@@ -23,7 +23,7 @@ public static class SharedWeightChecks
         if (scratch.IsValid) throw new Exception("Releasing a lane kept its own buffer.");
         if (!weight.IsValid) throw new Exception("Releasing one lane freed the shared weights.");
         var readback = new float[values.Length];
-        using (var batch = new TensorInference.TensorBatch())
+        using (var batch = new HumanoidMocapX.TensorInference.TensorBatch())
         {
             try { await batch.RunAsync(() => { }, weight, readback, cancellation); }
             finally { await GameTask.MainThread(); }
