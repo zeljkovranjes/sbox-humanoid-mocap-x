@@ -3,10 +3,11 @@ using HumanoidMocapX.Core.Motion;
 
 namespace HumanoidMocapX.Inference;
 
-/// <summary>What the video shows beyond FlowHMR's motion: per-frame <see cref="SamObservations"/>
-/// and the camera rotations. Applying it to a capture takes wrist turn, fingers and head pitch
+/// <summary>What the video shows beyond FlowHMR's motion: per-frame <see cref="SamObservations"/>,
+/// the camera rotations and how far the camera travels (<see cref="FlowCamera.Travel"/>; NaN
+/// when unknown). Applying it to a capture takes wrist turn, fingers and head pitch
 /// from SAM 3D Body and, with a static camera, holds the root where the video puts it.</summary>
-internal sealed record ObservedDetail(float[] Observations, float[] CameraRotations)
+internal sealed record ObservedDetail(float[] Observations, float[] CameraRotations, float CameraTravel)
 {
     /// <summary>Corrects <paramref name="document"/>, whose frames match the observed frames one
     /// to one, in place, and notes each correction in its diagnostics. Throws
@@ -16,10 +17,10 @@ internal sealed record ObservedDetail(float[] Observations, float[] CameraRotati
         var hands = HandTransfer.Apply(document, Observations);
         var fingers = FingerTransfer.Apply(document, Observations);
         var head = HeadPitch.Apply(document, Observations);
-        var root = RootAnchor.Apply(document, Observations, CameraRotations);
+        var root = RootAnchor.Apply(document, Observations, CameraRotations, CameraTravel);
         document.Diagnostics.Add(FormattableString.Invariant($"Wrists and fingers follow SAM 3D Body's hand close-ups in {hands * 100:0}% and {fingers * 100:0}% of hand frames; head pitch follows its face keypoints, by up to {head:0}°."));
         document.Diagnostics.Add(root is { } shift
             ? FormattableString.Invariant($"The camera is static, so the root follows the person's position in the video, up to {shift:0.00} m from FlowHMR's path.")
-            : "The camera moves, so the root follows FlowHMR's path.");
+            : "The camera moves or its motion is unknown, so the root follows FlowHMR's path.");
     }
 }

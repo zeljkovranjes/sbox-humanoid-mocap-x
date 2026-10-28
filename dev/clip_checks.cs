@@ -37,11 +37,11 @@ public static class ClipChecks
         if (person.First != 0 || person.Count != frames.Count) throw new InvalidDataException("The validation fixture must show the person in every frame.");
         var boxes = person.Boxes; await Save("boxes.json", boxes); await Save("timings.json", times); timer.Restart();
         var camera = await processor.CameraAsync(frames, cancellation); times["Camera"] = timer.Elapsed.TotalSeconds;
-        await Save("rotations.json", camera.Rotations); await Save("intrinsics.json", camera.Intrinsics); await Save("timings.json", times); timer.Restart();
+        await Save("rotations.json", camera.Rotations); await Save("intrinsics.json", camera.Intrinsics); await Save("travel.json", camera.Travel); await Save("timings.json", times); timer.Restart();
         var (features, observations) = await processor.FeaturesAsync(frames, boxes, camera.Intrinsics, cancellation); times["Features"] = timer.Elapsed.TotalSeconds;
         await Save("features.json", features); await Save("observations.json", observations); await Save("timings.json", times); timer.Restart();
         var motion = await processor.GenerateAsync(features, camera.Rotations, frames.Count, cancellation); times["Generation"] = timer.Elapsed.TotalSeconds;
-        var exports = await Export(fixture, motion, new ObservedDetail(observations, camera.Rotations), directory, cancellation); await Save("timings.json", times);
+        var exports = await Export(fixture, motion, new ObservedDetail(observations, camera.Rotations, camera.Travel), directory, cancellation); await Save("timings.json", times);
         var result = new { Passed = true, PredecodedFixture = true, Frames = frames.Count, Seconds = frames.Count / 30.0, StageSeconds = times, Exports = exports };
         await Save("result.json", result);
         return result;
@@ -58,7 +58,9 @@ public static class ClipChecks
         var rotations = JsonSerializer.Deserialize<float[]>(await File.ReadAllTextAsync(Path.Combine(directory, "rotations.json"), cancellation));
         var motion = await Processor(fixture).GenerateAsync(features, rotations, fixture.Frames, cancellation);
         var observed = Path.Combine(directory, "observations.json");
-        var detail = File.Exists(observed) ? new ObservedDetail(JsonSerializer.Deserialize<float[]>(await File.ReadAllTextAsync(observed, cancellation)), rotations) : null;
+        var traveled = Path.Combine(directory, "travel.json");
+        var travel = File.Exists(traveled) ? JsonSerializer.Deserialize<float>(await File.ReadAllTextAsync(traveled, cancellation)) : float.NaN;
+        var detail = File.Exists(observed) ? new ObservedDetail(JsonSerializer.Deserialize<float[]>(await File.ReadAllTextAsync(observed, cancellation)), rotations, travel) : null;
         return await Export(fixture, motion, detail, directory, cancellation);
     }
 

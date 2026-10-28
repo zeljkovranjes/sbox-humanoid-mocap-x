@@ -7,6 +7,8 @@ using System.Threading;
 
 namespace HumanoidMocapX;
 
+using Vector3 = System.Numerics.Vector3;
+
 /// <summary>Converts VGGT-Omega predictions to FlowHMR rotation features and SAM
 /// intrinsics. This decodes camera predictions; it does not estimate them from images.</summary>
 public static class FlowCamera
@@ -81,6 +83,27 @@ public static class FlowCamera
             matrix[4] = (float)((1d - fraction) * left.Fy + fraction * (double)right.Fy);
             matrix[2] = originalWidth * .5f; matrix[5] = originalHeight * .5f; matrix[8] = 1;
         }
+    }
+
+    /// <summary>The largest distance of any sampled camera centre from the first, in VGGT's
+    /// scene-normalized units, where the mean distance of the scene from the first camera is
+    /// about 1. A tripod gives nearly 0; a camera that slides with the subject does not. Rejects
+    /// the same invalid poses as <see cref="Decode"/>.</summary>
+    public static float Travel(ReadOnlySpan<float> poses)
+    {
+        if (poses.Length == 0 || poses.Length % PoseChannels != 0)
+            throw new ArgumentException("Camera travel needs [samples,9] poses.");
+        Vector3 first = default; float travel = 0;
+        for (var sample = 0; sample < poses.Length / PoseChannels; sample++)
+        {
+            var pose = poses.Slice(sample * PoseChannels, PoseChannels);
+            // Poses are camera-from-world, so the centre is -R^T t.
+            var (rotation, _, _) = ReadPose(pose, 1, 1, sample);
+            var centre = -Vector3.Transform(new Vector3(pose[0], pose[1], pose[2]), Quaternion.Conjugate(rotation));
+            if (sample == 0) first = centre;
+            travel = MathF.Max(travel, Vector3.Distance(centre, first));
+        }
+        return travel;
     }
 
     static (Quaternion Rotation, float Fx, float Fy) ReadPose(ReadOnlySpan<float> pose, int width, int height, int sample)

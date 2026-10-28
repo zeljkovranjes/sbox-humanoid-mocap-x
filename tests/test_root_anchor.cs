@@ -9,7 +9,7 @@ static class RootAnchorTests
     {
         var still = Long(MotionTests.Fixture()).ToDocument(); var observations = ObservationFixture.Observe(still);
         var drifting = Drifting().ToDocument(); var rotations = ObservationFixture.StaticCamera(drifting);
-        var shift = RootAnchor.Apply(drifting, observations, rotations);
+        var shift = RootAnchor.Apply(drifting, observations, rotations, 0);
         MotionTests.Check(shift is > .3 and < .55, $"Expected the anchor to undo most of the drift, shifted {shift}");
         var last = drifting.Frames[^1].Positions[0]; var start = drifting.Frames[0].Positions[0];
         MotionTests.Check(Math.Abs(last[0] - still.Frames[^1].Positions[0][0]) < .03, $"Root still drifts: {last[0]}");
@@ -23,10 +23,12 @@ static class RootAnchorTests
             turning[f * 9] = MathF.Cos(angle); turning[f * 9 + 2] = MathF.Sin(angle); turning[f * 9 + 6] = -MathF.Sin(angle); turning[f * 9 + 8] = MathF.Cos(angle);
         }
         var untouched = Drifting().ToDocument();
-        MotionTests.Check(RootAnchor.Apply(untouched, observations, turning) is null, "A turning camera must not anchor the root");
+        MotionTests.Check(RootAnchor.Apply(untouched, observations, turning, 0) is null, "A turning camera must not anchor the root");
+        MotionTests.Check(RootAnchor.Apply(untouched, observations, rotations, RootAnchor.MaxCameraTravel * 2) is null, "A travelling camera must not anchor the root");
+        MotionTests.Check(RootAnchor.Apply(untouched, observations, rotations, float.NaN) is null, "Unknown camera travel must not anchor the root");
         MotionTests.Near(Drift, untouched.Frames[^1].Positions[0][0], 1e-6);
-        MotionTests.Throws<ArgumentException>(() => RootAnchor.Apply(untouched, observations, rotations.AsSpan(9)));
-        Console.WriteLine("PASS: root anchor removes drift the camera does not see, keeps height and start, and leaves turning cameras alone");
+        MotionTests.Throws<ArgumentException>(() => RootAnchor.Apply(untouched, observations, rotations.AsSpan(9), 0));
+        Console.WriteLine("PASS: root anchor removes drift the camera does not see, keeps height and start, and leaves turning, travelling or unknown cameras alone");
     }
 
     /// <summary>The motion fixture over 10 s, wandering sideways by <see cref="Drift"/> metres.</summary>
