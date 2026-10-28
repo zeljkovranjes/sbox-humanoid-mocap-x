@@ -33,8 +33,9 @@ public static class ClipChecks
         var processor = Processor(fixture); using var frames = new RawFrames(fixture);
         await Task.Run(() => FlowCheckpoint.LoadDecoder(fixture.FlowPath, fixture.SmplPath, cancellation), cancellation);
         var timer = Stopwatch.StartNew(); var times = new Dictionary<string, double>();
-        var boxes = await processor.DetectAsync(frames, cancellation); times["Detection"] = timer.Elapsed.TotalSeconds;
-        await Save("boxes.json", boxes); await Save("timings.json", times); timer.Restart();
+        var person = await processor.DetectAsync(frames, cancellation); times["Detection"] = timer.Elapsed.TotalSeconds;
+        if (person.First != 0 || person.Count != frames.Count) throw new InvalidDataException("The validation fixture must show the person in every frame.");
+        var boxes = person.Boxes; await Save("boxes.json", boxes); await Save("timings.json", times); timer.Restart();
         var camera = await processor.CameraAsync(frames, cancellation); times["Camera"] = timer.Elapsed.TotalSeconds;
         await Save("rotations.json", camera.Rotations); await Save("intrinsics.json", camera.Intrinsics); await Save("timings.json", times); timer.Restart();
         var features = await processor.FeaturesAsync(frames, boxes, camera.Intrinsics, cancellation); times["Features"] = timer.Elapsed.TotalSeconds;
