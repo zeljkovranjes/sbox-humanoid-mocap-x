@@ -18,6 +18,8 @@ internal sealed record ObservedDetail(float[] Observations, float[] CameraRotati
         var fingers = FingerTransfer.Apply(document, Observations);
         var head = HeadPitch.Apply(document, Observations);
         var root = RootAnchor.Apply(document, Observations, CameraRotations, CameraTravel);
+        if (CaptureSpin.Apply(document) is var spun && spun > 0)
+            document.Diagnostics.Add(FormattableString.Invariant($"Fast spins turn evenly: the body's heading was smoothed in {spun} frames."));
         document.Diagnostics.Add(FormattableString.Invariant($"Wrists and fingers follow SAM 3D Body's hand close-ups in {hands * 100:0}% and {fingers * 100:0}% of hand frames; head pitch follows its face keypoints, by up to {head:0}°."));
         document.Diagnostics.Add(root is { } shift
             ? FormattableString.Invariant($"The camera is static, so the root follows the person's position in the video, up to {shift:0.00} m from FlowHMR's path.")
